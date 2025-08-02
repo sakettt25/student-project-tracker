@@ -2,11 +2,15 @@ import { type NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import User from "@/lib/models/User"
 import jwt from "jsonwebtoken"
+import { compare } from "bcryptjs"
 
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
     const { email, password } = await request.json()
+
+    // Log incoming request
+    console.log("Login request received for email:", email)
 
     // Find user
     const user = await User.findOne({ email }).populate("facultyId", "name")
@@ -14,8 +18,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    // Check password
-    const isMatch = await user.comparePassword(password)
+    // Compare passwords using bcryptjs
+    const isMatch = await compare(password, user.password)
+    console.log("Password validation result:", isMatch) // Debug password comparison
+
     if (!isMatch) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }

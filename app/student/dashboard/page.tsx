@@ -23,6 +23,7 @@ import { User, GraduationCap, BookOpen, Clock, CheckCircle, AlertCircle, Plus } 
 
 export default function StudentDashboard() {
   const { user, token } = useAuth()
+  console.log("User data:", user) // This will help us see what fields are actually available
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [projectForm, setProjectForm] = useState({
     name: "",
@@ -51,6 +52,7 @@ export default function StudentDashboard() {
   }
 
   const [projects, setProjects] = useState<Project[]>([])
+  const [facultyDetails, setFacultyDetails] = useState<{ name: string; email: string } | null>(null)
 
   // Add this useEffect after the existing useAuth call:
   useEffect(() => {
@@ -83,6 +85,33 @@ export default function StudentDashboard() {
 
     fetchProjects()
   }, [token])
+
+  // Update the faculty details fetch useEffect
+  useEffect(() => {
+    const fetchFacultyDetails = async () => {
+      if (!user?.facultyId || !token) return
+
+      try {
+        const response = await fetch(`/api/users/faculty/${user.facultyId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setFacultyDetails({
+            name: data.name,
+            email: data.email,
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch faculty details:", error)
+      }
+    }
+
+    fetchFacultyDetails()
+  }, [user?.facultyId, token])
 
   // Update the handleFormSubmit function:
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -163,7 +192,14 @@ export default function StudentDashboard() {
                   <span className="font-medium">Semester:</span> {user?.semester}
                 </div>
                 <div>
-                  <span className="font-medium">Faculty:</span> Dr. John Smith
+                  <span className="font-medium">Faculty:</span>{" "}
+                  {facultyDetails ? (
+                    <span>
+                      {facultyDetails.name} ({facultyDetails.email})
+                    </span>
+                  ) : (
+                    "Loading faculty details..."
+                  )}
                 </div>
                 <div>
                   <span className="font-medium">Email:</span> {user?.email}
