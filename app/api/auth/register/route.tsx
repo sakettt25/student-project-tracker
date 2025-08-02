@@ -7,38 +7,38 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB()
     const userData = await request.json()
-    console.log("Received userData:", userData); // Keep this for now, remove after fix
+    console.log("Received userData:", userData)
 
-    // Explicitly check for rollNumber if role is student
-    if (userData.role === "student" && (!userData.roll_number || userData.roll_number.trim() === "")) {
-      return NextResponse.json({ error: "Roll number is required for students" }, { status: 400 });
+    if (userData.role === "student") {
+      if (!userData.rollNumber || userData.rollNumber.trim() === "") {
+        return NextResponse.json({ error: "Roll number is required for students" }, { status: 400 })
+      }
+      if (!userData.facultyId) {
+        return NextResponse.json({ error: "Faculty selection is required for students" }, { status: 400 })
+      }
+      // Verify if selected faculty exists
+      const faculty = await User.findOne({ _id: userData.facultyId, role: "faculty" })
+      if (!faculty) {
+        return NextResponse.json({ error: "Selected faculty not found" }, { status: 400 })
+      }
     }
 
-    // Check if user already exists
+    // Check existing user
     const existingUser = await User.findOne({ email: userData.email })
     if (existingUser) {
       return NextResponse.json({ error: "User already exists" }, { status: 400 })
     }
 
-    // For students, find a faculty member to assign
-    let facultyId = null
-    if (userData.role === "student") {
-      const faculty = await User.findOne({ role: "faculty" })
-      if (faculty) {
-        facultyId = faculty._id
-      }
-    }
-
-    // Create new user
+    // Create new user with facultyId
     const newUser = new User({
       email: userData.email,
       password: userData.password,
       role: userData.role,
       name: userData.name,
       university: userData.university,
-      rollNumber: userData.roll_number, // Changed from userData.rollNumber to userData.roll_number
+      rollNumber: userData.rollNumber,
       semester: userData.semester,
-      facultyId: facultyId,
+      facultyId: userData.role === "student" ? userData.facultyId : undefined
     })
 
     await newUser.save()
@@ -47,22 +47,22 @@ export async function POST(request: NextRequest) {
     const token = jwt.sign(
       { userId: newUser._id, email: newUser.email, role: newUser.role },
       process.env.NEXTAUTH_SECRET!,
-      { expiresIn: "7d" },
+      { expiresIn: "7d" }
     )
 
-    // Return user data and token
-    const userResponse = {
-      id: newUser._id,
-      email: newUser.email,
-      role: newUser.role,
-      name: newUser.name,
-      university: newUser.university,
-      rollNumber: newUser.roll_number, // Changed from newUser.rollNumber to newUser.roll_number
-      semester: newUser.semester,
-      facultyId: newUser.facultyId,
-    }
-
-    return NextResponse.json({ user: userResponse, token })
+    return NextResponse.json({
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        role: newUser.role,
+        name: newUser.name,
+        university: newUser.university,
+        rollNumber: newUser.rollNumber,
+        semester: newUser.semester,
+        facultyId: newUser.facultyId
+      },
+      token
+    })
   } catch (error) {
     console.error("Registration error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

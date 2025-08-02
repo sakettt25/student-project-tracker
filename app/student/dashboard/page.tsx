@@ -40,7 +40,17 @@ export default function StudentDashboard() {
     approved: 0,
   })
 
-  const [projects, setProjects] = useState([])
+  type Project = {
+    name: string
+    description: string
+    techStack: string
+    realLifeApplication: string
+    expectedCompletionDate: string
+    status: string
+    // Add other fields as needed
+  }
+
+  const [projects, setProjects] = useState<Project[]>([])
 
   // Add this useEffect after the existing useAuth call:
   useEffect(() => {
@@ -147,7 +157,7 @@ export default function StudentDashboard() {
                   <span className="font-medium">Name:</span> {user?.name}
                 </div>
                 <div>
-                  <span className="font-medium">Roll Number:</span> {user?.roll_number}
+                  <span className="font-medium">Roll Number:</span> {user?.rollNumber}
                 </div>
                 <div>
                   <span className="font-medium">Semester:</span> {user?.semester}

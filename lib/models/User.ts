@@ -37,26 +37,18 @@ const userSchema = new mongoose.Schema(
     },
     university: {
       type: String,
-      required: function (this: IUser) {
-        return this.role === "faculty"
-      },
     },
     rollNumber: {
       type: String,
-      required: function (this: IUser) {
-        return this.role === "student"
-      },
+      sparse: true,
     },
     semester: {
       type: Number,
-      required: function (this: IUser) {
-        return this.role === "student"
-      },
     },
     facultyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: function (this: IUser) {
+      required: function(this: any) {
         return this.role === "student"
       },
     },

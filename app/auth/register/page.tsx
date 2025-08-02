@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -26,9 +26,28 @@ export default function Register() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [faculties, setFaculties] = useState([])
 
   const { register } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    const fetchFaculties = async () => {
+      if (formData.role === "student") {
+        try {
+          const response = await fetch("/api/faculty")
+          if (response.ok) {
+            const data = await response.json()
+            setFaculties(data)
+          }
+        } catch (error) {
+          console.error("Failed to fetch faculty list:", error)
+        }
+      }
+    }
+
+    fetchFaculties()
+  }, [formData.role])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,6 +167,24 @@ export default function Register() {
                       {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                         <SelectItem key={sem} value={sem.toString()}>
                           {sem}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="faculty">Select Faculty</Label>
+                  <Select
+                    value={formData.facultyId}
+                    onValueChange={(value) => handleInputChange("facultyId", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a faculty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faculties.map((faculty: any) => (
+                        <SelectItem key={faculty._id} value={faculty._id}>
+                          {faculty.name} - {faculty.university}
                         </SelectItem>
                       ))}
                     </SelectContent>
