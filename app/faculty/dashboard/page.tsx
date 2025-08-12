@@ -15,13 +15,17 @@ export default function FacultyDashboard() {
     pending: 0,
     approved: 0,
   })
-
   const [projects, setProjects] = useState([])
+  const [facultyDetails, setFacultyDetails] = useState<{ name: string; university: string; email: string } | null>(null)
+  const [studentCount, setStudentCount] = useState<number | null>(null)
+  const [loadingFaculty, setLoadingFaculty] = useState(true)
+  const [loadingStudents, setLoadingStudents] = useState(true)
+  const [loadingProjects, setLoadingProjects] = useState(true)
 
   useEffect(() => {
     const fetchProjects = async () => {
       if (!token) return
-
+      setLoadingProjects(true)
       try {
         const response = await fetch("/api/projects", {
           headers: {
@@ -43,10 +47,61 @@ export default function FacultyDashboard() {
       } catch (error) {
         console.error("Failed to fetch projects:", error)
       }
+      setLoadingProjects(false)
     }
 
     fetchProjects()
   }, [token])
+
+  useEffect(() => {
+    // Fetch faculty details from backend for latest info
+    const fetchFacultyDetails = async () => {
+      if (!user?.id || !token) return
+      setLoadingFaculty(true)
+      try {
+        const response = await fetch(`/api/users/faculty/${user.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setFacultyDetails({
+            name: data.name,
+            university: data.university,
+            email: data.email,
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch faculty details:", error)
+      }
+      setLoadingFaculty(false)
+    }
+    fetchFacultyDetails()
+  }, [user?.id, token])
+
+  useEffect(() => {
+    // Fetch students count under this faculty
+    const fetchStudentCount = async () => {
+      if (!user?.id || !token) return
+      setLoadingStudents(true)
+      try {
+        const response = await fetch(`/api/faculty/${user.id}/students/count`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setStudentCount(data.count)
+        }
+      } catch (error) {
+        console.error("Failed to fetch student count:", error)
+      }
+      setLoadingStudents(false)
+    }
+    fetchStudentCount()
+  }, [user?.id, token])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,13 +124,22 @@ export default function FacultyDashboard() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <div>
-                  <span className="font-medium">Name:</span> {user?.name}
+                  <span className="font-medium">Name:</span>{" "}
+                  {loadingFaculty
+                    ? <span className="text-gray-400">Loading...</span>
+                    : (facultyDetails?.name || <span className="text-gray-400">Not available</span>)}
                 </div>
                 <div>
-                  <span className="font-medium">University:</span> {user?.university}
+                  <span className="font-medium">University:</span>{" "}
+                  {loadingFaculty
+                    ? <span className="text-gray-400">Loading...</span>
+                    : (facultyDetails?.university || <span className="text-gray-400">Not available</span>)}
                 </div>
                 <div>
-                  <span className="font-medium">Email:</span> {user?.email}
+                  <span className="font-medium">Email:</span>{" "}
+                  {loadingFaculty
+                    ? <span className="text-gray-400">Loading...</span>
+                    : (facultyDetails?.email || <span className="text-gray-400">Not available</span>)}
                 </div>
               </CardContent>
             </Card>
@@ -87,15 +151,27 @@ export default function FacultyDashboard() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span>Total Students</span>
-                  <Badge variant="secondary">15</Badge>
+                  <Badge variant="secondary">
+                    {loadingStudents
+                      ? <span className="text-gray-400">Loading...</span>
+                      : studentCount}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Active Projects</span>
-                  <Badge variant="secondary">{stats.inReview + stats.pending}</Badge>
+                  <Badge variant="secondary">
+                    {loadingProjects
+                      ? <span className="text-gray-400">Loading...</span>
+                      : stats.inReview + stats.pending}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Completed Projects</span>
-                  <Badge variant="secondary">{stats.approved}</Badge>
+                  <Badge variant="secondary">
+                    {loadingProjects
+                      ? <span className="text-gray-400">Loading...</span>
+                      : stats.approved}
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
@@ -109,7 +185,11 @@ export default function FacultyDashboard() {
                 <AlertCircle className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{stats.inReview}</div>
+                <div className="text-2xl font-bold text-orange-600">
+                  {loadingProjects
+                    ? <span className="text-gray-400">Loading...</span>
+                    : stats.inReview}
+                </div>
                 <p className="text-xs text-muted-foreground">Awaiting your feedback</p>
               </CardContent>
             </Card>
@@ -120,7 +200,11 @@ export default function FacultyDashboard() {
                 <Clock className="h-4 w-4 text-yellow-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+                <div className="text-2xl font-bold text-yellow-600">
+                  {loadingProjects
+                    ? <span className="text-gray-400">Loading...</span>
+                    : stats.pending}
+                </div>
                 <p className="text-xs text-muted-foreground">Awaiting approval</p>
               </CardContent>
             </Card>
@@ -131,7 +215,11 @@ export default function FacultyDashboard() {
                 <CheckCircle className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {loadingProjects
+                    ? <span className="text-gray-400">Loading...</span>
+                    : stats.approved}
+                </div>
                 <p className="text-xs text-muted-foreground">Completed successfully</p>
               </CardContent>
             </Card>

@@ -18,25 +18,15 @@ export async function GET(
       )
     }
 
-    const faculty = await User.findOne({ 
-      _id: params.id,
-      role: 'faculty'
-    }).select('name email university') // include _id for debugging if needed
-
-    if (!faculty) {
-      return NextResponse.json(
-        { error: 'Faculty not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      name: faculty.name,
-      university: faculty.university,
-      email: faculty.email,
+    // Count students with facultyId matching params.id
+    const count = await User.countDocuments({
+      facultyId: params.id,
+      role: 'student',
     })
+
+    return NextResponse.json({ count })
   } catch (error) {
-    console.error('Error fetching faculty:', error)
+    console.error('Error fetching student count:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
