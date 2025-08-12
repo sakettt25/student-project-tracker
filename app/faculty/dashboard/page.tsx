@@ -14,6 +14,7 @@ export default function FacultyDashboard() {
     inReview: 0,
     pending: 0,
     approved: 0,
+    rejected: 0, // <-- Add rejected
   })
   const [projects, setProjects] = useState([])
   const [facultyDetails, setFacultyDetails] = useState<{ name: string; university: string; email: string } | null>(null)
@@ -41,8 +42,9 @@ export default function FacultyDashboard() {
           const inReview = data.projects.filter((p: any) => p.status === "in_review").length
           const pending = data.projects.filter((p: any) => p.status === "pending").length
           const approved = data.projects.filter((p: any) => p.status === "approved").length
+          const rejected = data.projects.filter((p: any) => p.status === "rejected").length // <-- Count rejected
 
-          setStats({ inReview, pending, approved })
+          setStats({ inReview, pending, approved, rejected }) // <-- Add rejected
         }
       } catch (error) {
         console.error("Failed to fetch projects:", error)
@@ -179,7 +181,7 @@ export default function FacultyDashboard() {
 
           {/* Project Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
+            {/* <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Projects in Review</CardTitle>
                 <AlertCircle className="h-4 w-4 text-orange-600" />
@@ -192,7 +194,7 @@ export default function FacultyDashboard() {
                 </div>
                 <p className="text-xs text-muted-foreground">Awaiting your feedback</p>
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -221,6 +223,21 @@ export default function FacultyDashboard() {
                     : stats.approved}
                 </div>
                 <p className="text-xs text-muted-foreground">Completed successfully</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Projects Rejected</CardTitle>
+                <AlertCircle className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {loadingProjects
+                    ? <span className="text-gray-400">Loading...</span>
+                    : stats.rejected}
+                </div>
+                <p className="text-xs text-muted-foreground">Rejected by you</p>
               </CardContent>
             </Card>
           </div>

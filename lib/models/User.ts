@@ -38,13 +38,8 @@ const userSchema = new mongoose.Schema(
     university: {
       type: String,
     },
-    rollNumber: {
-      type: String,
-      sparse: true,
-    },
-    semester: {
-      type: Number,
-    },
+    rollNumber: { type: String },
+    semester: { type: String },
     facultyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

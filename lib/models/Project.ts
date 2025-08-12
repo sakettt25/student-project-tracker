@@ -12,7 +12,24 @@ export interface IProject extends mongoose.Document {
   progress: number
   createdAt: Date
   updatedAt: Date
+  feedback: IFeedback[]
 }
+
+export interface IFeedback {
+  message: string
+  facultyId: string
+  facultyName: string
+  createdAt: Date
+  action: "approve" | "reject"
+}
+
+const FeedbackSchema = new mongoose.Schema({
+  message: String,
+  facultyId: String,
+  facultyName: String,
+  createdAt: { type: Date, default: Date.now },
+  action: { type: String, enum: ["approve", "reject"] },
+})
 
 const projectSchema = new mongoose.Schema(
   {
@@ -57,6 +74,7 @@ const projectSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    feedback: [FeedbackSchema],
   },
   {
     timestamps: true,

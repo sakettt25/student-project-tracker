@@ -20,35 +20,27 @@ export async function PATCH(
 
     const { status, feedback, facultyId, facultyName } = await request.json()
 
-    const updatedProject = await Project.findByIdAndUpdate(
-      params.id,
-      {
-        $set: {
-          status,
-          updatedAt: new Date()
-        },
-        $push: {
-          feedback: {
-            id: new mongoose.Types.ObjectId().toString(),
-            message: feedback,
-            facultyId,
-            facultyName,
-            createdAt: new Date(),
-            action: status === 'approved' ? 'approve' : 'reject'
-          }
-        }
-      },
-      { new: true }
-    )
-
-    if (!updatedProject) {
+    const project = await Project.findById(params.id)
+    if (!project) {
       return NextResponse.json(
         { error: "Project not found" },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ success: true, project: updatedProject })
+    project.status = status
+    project.feedback = project.feedback || []
+    project.feedback.push({
+      message: feedback,
+      facultyId,
+      facultyName,
+      createdAt: new Date(),
+      action: status === "approved" ? "approve" : "reject"
+    })
+
+    await project.save()
+
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating project:", error)
     return NextResponse.json(
