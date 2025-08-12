@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { FacultyNavbar } from "@/components/faculty-navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,63 +8,181 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Eye, MessageSquare } from "lucide-react"
+import { Eye, MessageSquare, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+interface FeedbackItem {
+  id: string
+  message: string
+  facultyId: string
+  facultyName: string
+  createdAt: string
+  action: 'approve' | 'reject'
+}
+
+interface Project {
+  _id: string  // Change from 'id' to '_id' to match MongoDB
+  studentId: string
+  studentName: string
+  project: string
+  status: 'pending' | 'in_review' | 'approved' | 'rejected'
+  description: string
+  techStack: string
+  realLifeApplication: string
+  expectedCompletion: string
+  feedback: FeedbackItem[]
+}
 
 export default function ProjectReview() {
-  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [feedback, setFeedback] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Mock data
-  const projectsInReview = [
-    { id: 1, student: "Alice Brown", project: "E-commerce Platform", status: "in_review" },
-    { id: 2, student: "David Lee", project: "Social Media App", status: "in_review" },
-    { id: 3, student: "Emma Wilson", project: "Learning Management System", status: "in_review" },
-  ]
+  useEffect(() => {
+    fetchProjects()
+  }, [])
 
-  const projectsPending = [
-    { id: 4, student: "Frank Miller", project: "Inventory System", status: "pending" },
-    { id: 5, student: "Grace Chen", project: "Chat Application", status: "pending" },
-    { id: 6, student: "Henry Davis", project: "Portfolio Website", status: "pending" },
-    { id: 7, student: "Ivy Johnson", project: "Recipe Finder", status: "pending" },
-    { id: 8, student: "Jack Brown", project: "Expense Tracker", status: "pending" },
-  ]
-
-  const projectsApproved = [
-    { id: 9, student: "Bob Wilson", project: "Task Management App", status: "approved" },
-    { id: 10, student: "Carol Davis", project: "Weather Dashboard", status: "approved" },
-    { id: 11, student: "Lisa Wang", project: "Blog Platform", status: "approved" },
-    { id: 12, student: "Mike Johnson", project: "Quiz App", status: "approved" },
-  ]
-
-  const handleProjectClick = (project: any) => {
-    setSelectedProject({
-      ...project,
-      description: "A comprehensive project description would go here...",
-      techStack: "React, Node.js, MongoDB",
-      realLifeApplication: "This project can be used in real business scenarios...",
-      expectedCompletion: "2024-12-15",
-    })
+  const fetchProjects = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      if (!response.ok) throw new Error('Failed to fetch projects')
+      
+      const data = await response.json()
+      console.log('Raw project data:', data) // Add this for debugging
+      setProjects(data.projects)
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+      toast.error('Failed to load projects')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleFeedbackSubmit = () => {
-    // In real app, this would submit feedback to API
-    console.log("Feedback submitted:", feedback)
-    setFeedback("")
-    setSelectedProject(null)
+  // Update the handleProjectAction function
+  const handleProjectAction = async (action: 'approve' | 'reject') => {
+    if (!selectedProject || !feedback.trim()) {
+      toast.error('Please provide feedback before submitting')
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      console.log('Selected Project ID:', selectedProject._id) // Add this for debugging
+
+      const response = await fetch(`/api/projects/${selectedProject._id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: action === 'approve' ? 'approved' : 'rejected',
+          feedback,
+          facultyId: localStorage.getItem('facultyId'),
+          facultyName: localStorage.getItem('facultyName')
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || `Failed to ${action} project`)
+      }
+
+      toast.success(`Project ${action}ed successfully`)
+      setSelectedProject(null)
+      setFeedback('')
+      await fetchProjects()
+    } catch (error) {
+      console.error(`Error ${action}ing project:`, error)
+      toast.error(
+        typeof error === "object" && error !== null && "message" in error
+          ? (error as { message?: string }).message
+          : `Failed to ${action} project`
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const ProjectCard = ({ project, onClick }: { project: any; onClick: () => void }) => (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
+  const ProjectCard = ({ project }: { project: Project }) => (
+    <Card 
+      className="cursor-pointer hover:shadow-md transition-shadow" 
+      onClick={() => {
+        console.log('Selected project:', project) // Add this for debugging
+        setSelectedProject(project)
+      }}
+    >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium">{project.student}</h4>
+            <h4 className="font-medium">{project.studentName}</h4>
             <p className="text-sm text-gray-600">{project.project}</p>
+            <Badge variant={
+              project.status === 'approved' ? 'default' :
+              project.status === 'rejected' ? 'destructive' :
+              project.status === 'pending' ? 'secondary' :
+              'secondary'
+            }>
+              {project.status}
+            </Badge>
           </div>
           <Eye className="h-4 w-4 text-gray-400" />
         </div>
       </CardContent>
     </Card>
+  )
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  // Add console logging to debug
+  const filterProjects = (status: Project['status']) => {
+    console.log('Filtering for status:', status)
+    console.log('All projects:', projects)
+    const filtered = projects.filter(project => project.status === status)
+    console.log('Filtered projects:', filtered)
+    return filtered
+  }
+
+  const FeedbackHistory = ({ feedback }: { feedback: FeedbackItem[] }) => (
+    <div className="space-y-4">
+      <h4 className="font-medium mb-2">Feedback History</h4>
+      {feedback?.length === 0 ? (
+        <p className="text-sm text-gray-500">No feedback yet</p>
+      ) : (
+        <div className="space-y-3">
+          {feedback.map((item) => (
+            <div key={item.id} className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <Badge variant={item.action === 'approve' ? 'default' : 'destructive'}>
+                    {item.action === 'approve' ? 'Approved' : 'Rejected'}
+                  </Badge>
+                  <p className="text-sm text-gray-500 mt-1">By {item.facultyName}</p>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {new Date(item.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">{item.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 
   return (
@@ -78,60 +196,60 @@ export default function ProjectReview() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* In Review */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Projects in Review
-                  <Badge variant="secondary">{projectsInReview.length}</Badge>
-                </CardTitle>
-                <CardDescription>Projects currently being reviewed</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-96">
-                  <div className="space-y-3">
-                    {projectsInReview.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => handleProjectClick(project)} />
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-
             {/* Pending Review */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Pending Review
-                  <Badge variant="secondary">{projectsPending.length}</Badge>
+                  <Badge variant="secondary">{filterProjects('pending').length}</Badge>
                 </CardTitle>
                 <CardDescription>New project submissions</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projectsPending.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => handleProjectClick(project)} />
+                    {filterProjects('pending').map((project) => (
+                      <ProjectCard key={project._id} project={project} />
                     ))}
                   </div>
                 </ScrollArea>
               </CardContent>
             </Card>
 
-            {/* Approved */}
+            {/* Approved Projects */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Approved Projects
-                  <Badge variant="secondary">{projectsApproved.length}</Badge>
+                  <Badge variant="default">{filterProjects('approved').length}</Badge>
                 </CardTitle>
                 <CardDescription>Successfully approved projects</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projectsApproved.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => handleProjectClick(project)} />
+                    {filterProjects('approved').map((project) => (
+                      <ProjectCard key={project._id} project={project} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Rejected Projects */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  Rejected Projects
+                  <Badge variant="destructive">{filterProjects('rejected').length}</Badge>
+                </CardTitle>
+                <CardDescription>Projects needing changes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-96">
+                  <div className="space-y-3">
+                    {filterProjects('rejected').map((project) => (
+                      <ProjectCard key={project._id} project={project} />
                     ))}
                   </div>
                 </ScrollArea>
@@ -146,7 +264,7 @@ export default function ProjectReview() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{selectedProject?.project}</DialogTitle>
-            <DialogDescription>Submitted by {selectedProject?.student}</DialogDescription>
+            <DialogDescription>Submitted by {selectedProject?.studentName}</DialogDescription>
           </DialogHeader>
 
           {selectedProject && (
@@ -171,6 +289,8 @@ export default function ProjectReview() {
                 <p className="text-sm text-gray-600">{selectedProject.expectedCompletion}</p>
               </div>
 
+              <FeedbackHistory feedback={selectedProject.feedback || []} />
+
               <div>
                 <h4 className="font-medium mb-2">Provide Feedback</h4>
                 <Textarea
@@ -178,13 +298,37 @@ export default function ProjectReview() {
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   className="min-h-24"
+                  disabled={isSubmitting}
                 />
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleFeedbackSubmit} className="flex-1">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Submit Feedback
+                <Button 
+                  onClick={() => handleProjectAction('approve')} 
+                  className="flex-1"
+                  variant="default"
+                  disabled={isSubmitting || !feedback.trim()}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Approve Project
+                </Button>
+                
+                <Button 
+                  onClick={() => handleProjectAction('reject')} 
+                  className="flex-1"
+                  variant="destructive"
+                  disabled={isSubmitting || !feedback.trim()}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <XCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Request Changes
                 </Button>
                 <Button variant="outline" onClick={() => setSelectedProject(null)}>
                   Close
