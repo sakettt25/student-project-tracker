@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth"
 import { StudentNavbar } from "@/components/student-navbar"
@@ -19,11 +18,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { User, GraduationCap, BookOpen, Clock, CheckCircle, AlertCircle, Plus } from "lucide-react"
+import { User, GraduationCap, BookOpen, Clock, CheckCircle, AlertCircle, Plus, XCircle } from "lucide-react"
 
 export default function StudentDashboard() {
   const { user, token } = useAuth()
-  console.log("User data:", user) // This will help us see what fields are actually available
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [projectForm, setProjectForm] = useState({
     name: "",
@@ -33,28 +31,34 @@ export default function StudentDashboard() {
     expectedCompletion: "",
   })
 
-  // Replace the existing stats mock data with:
   const [stats, setStats] = useState({
     total: 0,
     inReview: 0,
     pending: 0,
     approved: 0,
+    rejected: 0,
   })
 
+  type FeedbackItem = {
+    message: string
+    facultyName?: string
+    createdAt?: string
+    action?: string
+  }
+
   type Project = {
+    _id?: string
     name: string
     description: string
     techStack: string
     realLifeApplication: string
     expectedCompletionDate: string
     status: string
-    // Add other fields as needed
+    feedback?: FeedbackItem[]
   }
 
   const [projects, setProjects] = useState<Project[]>([])
-  const [facultyDetails, setFacultyDetails] = useState<{ name: string; email: string } | null>(null)
 
-  // Add this useEffect after the existing useAuth call:
   useEffect(() => {
     const fetchProjects = async () => {
       if (!token) return
@@ -70,13 +74,14 @@ export default function StudentDashboard() {
           const data = await response.json()
           setProjects(data.projects)
 
-          // Calculate stats
+          // Calculate stats for this student
           const total = data.projects.length
           const inReview = data.projects.filter((p: any) => p.status === "in_review").length
           const pending = data.projects.filter((p: any) => p.status === "pending").length
           const approved = data.projects.filter((p: any) => p.status === "approved").length
+          const rejected = data.projects.filter((p: any) => p.status === "rejected").length
 
-          setStats({ total, inReview, pending, approved })
+          setStats({ total, inReview, pending, approved, rejected })
         }
       } catch (error) {
         console.error("Failed to fetch projects:", error)
@@ -86,34 +91,6 @@ export default function StudentDashboard() {
     fetchProjects()
   }, [token])
 
-  // Update the faculty details fetch useEffect
-  useEffect(() => {
-    const fetchFacultyDetails = async () => {
-      if (!user?.facultyId || !token) return
-
-      try {
-        const response = await fetch(`/api/users/faculty/${user.facultyId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setFacultyDetails({
-            name: data.name,
-            email: data.email,
-          })
-        }
-      } catch (error) {
-        console.error("Failed to fetch faculty details:", error)
-      }
-    }
-
-    fetchFacultyDetails()
-  }, [user?.facultyId, token])
-
-  // Update the handleFormSubmit function:
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!token) return
@@ -162,6 +139,60 @@ export default function StudentDashboard() {
     setProjectForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  // Utility function to format date
+  function formatDate(dateString?: string) {
+    if (!dateString) return ""
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return dateString
+    return date.toISOString().slice(0, 10)
+  }
+
+  // Generate dynamic recent activity from projects and feedback
+  const getRecentActivity = () => {
+    const activities: { type: string; text: string; date: string; color: string }[] = []
+
+    projects.forEach((project) => {
+      // Submission
+      const projectTitle = project.name || (project as any).project || "Untitled Project"
+
+      activities.push({
+        type: "submission",
+        text: `You submitted "${projectTitle}" for review`,
+        date: project._id ? project._id.toString().slice(0, 8) : "",
+        color: "blue",
+      })
+      if (project.status === "approved") {
+        activities.push({
+          type: "approved",
+          text: `Your "${projectTitle}" was approved`,
+          date: project.expectedCompletionDate,
+          color: "green",
+        })
+      }
+      if (project.status === "rejected") {
+        activities.push({
+          type: "rejected",
+          text: `Your "${projectTitle}" was rejected`,
+          date: project.expectedCompletionDate,
+          color: "red",
+        })
+      }
+      if (project.feedback && project.feedback.length > 0) {
+        project.feedback.forEach((fb) => {
+          activities.push({
+            type: "feedback",
+            text: `Faculty provided feedback on "${projectTitle}": "${fb.message}"`,
+            date: fb.createdAt || "",
+            color: "orange",
+          })
+        })
+      }
+    })
+
+    // Sort by date descending (most recent first)
+    return activities.sort((a, b) => (b.date > a.date ? 1 : -1))
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <StudentNavbar />
@@ -190,16 +221,6 @@ export default function StudentDashboard() {
                 </div>
                 <div>
                   <span className="font-medium">Semester:</span> {user?.semester}
-                </div>
-                <div>
-                  <span className="font-medium">Faculty:</span>{" "}
-                  {facultyDetails ? (
-                    <span>
-                      {facultyDetails.name} ({facultyDetails.email})
-                    </span>
-                  ) : (
-                    "Loading faculty details..."
-                  )}
                 </div>
                 <div>
                   <span className="font-medium">Email:</span> {user?.email}
@@ -306,7 +327,7 @@ export default function StudentDashboard() {
           </div>
 
           {/* Project Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
@@ -350,9 +371,20 @@ export default function StudentDashboard() {
                 <p className="text-xs text-muted-foreground">Successfully approved</p>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+                <XCircle className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
+                <p className="text-xs text-muted-foreground">Rejected by faculty</p>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Recent Activity */}
+          {/* Dynamic Recent Activity */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
@@ -360,30 +392,97 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Your "Task Management App" was approved</p>
-                    <p className="text-xs text-gray-500">2 hours ago</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Faculty provided feedback on "E-commerce Platform"</p>
-                    <p className="text-xs text-gray-500">1 day ago</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">You submitted "Weather Dashboard" for review</p>
-                    <p className="text-xs text-gray-500">3 days ago</p>
-                  </div>
-                </div>
+                {getRecentActivity().length === 0 ? (
+                  <div className="text-gray-500 text-sm">No recent activity yet.</div>
+                ) : (
+                  getRecentActivity().map((activity, idx) => (
+                    <div className="flex items-center space-x-4" key={idx}>
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          activity.color === "green"
+                            ? "bg-green-500"
+                            : activity.color === "blue"
+                            ? "bg-blue-500"
+                            : activity.color === "red"
+                            ? "bg-red-500"
+                            : "bg-orange-500"
+                        }`}
+                      ></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{activity.text}</p>
+                        <p className="text-xs text-gray-500">{formatDate(activity.date)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
+
+          {/* Project List */}
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">Your Projects</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {projects.length === 0 ? (
+                <div className="text-gray-500 text-sm">No projects submitted yet.</div>
+              ) : (
+                projects.map((project) => (
+                  <Card key={project._id}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        {project.name}
+                        <Badge
+                          className={
+                            project.status === "approved"
+                              ? "bg-green-100 text-green-800"
+                              : project.status === "rejected"
+                              ? "bg-red-100 text-red-800"
+                              : project.status === "in_review"
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }
+                        >
+                          {project.status.replace("_", " ")}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        Expected Completion: {formatDate(project.expectedCompletionDate)}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div>
+                        <span className="font-medium">Description:</span> {project.description}
+                      </div>
+                      <div>
+                        <span className="font-medium">Tech Stack:</span> {project.techStack}
+                      </div>
+                      <div>
+                        <span className="font-medium">Real-life Application:</span> {project.realLifeApplication}
+                      </div>
+                      <div className="mt-2">
+                        <span className="font-medium">Feedback:</span>
+                        {project.feedback && project.feedback.length > 0 ? (
+                          <ul className="list-disc ml-6">
+                            {project.feedback.map((fb, idx) => (
+                              <li key={idx} className="text-sm">
+                                <span className="font-semibold">{fb.facultyName ? fb.facultyName + ": " : ""}</span>
+                                {fb.message}{" "}
+                                <span className="text-xs text-gray-400">
+                                  ({fb.action === "approve" ? "Approved" : "Rejected"} on {formatDate(fb.createdAt)})
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-gray-500 ml-2">No feedback yet</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

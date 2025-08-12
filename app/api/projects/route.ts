@@ -29,18 +29,39 @@ export async function GET(request: NextRequest) {
     if (user.role === "faculty") {
       // Faculty can see projects assigned to them
       projects = await Project.find({ facultyId: user.userId })
-        .populate("studentId", "name rollNumber email")
+        .populate("studentId", "name rollNumber semester email")
         .populate("facultyId", "name email")
         .sort({ createdAt: -1 })
     } else {
       // Students can see their own projects
       projects = await Project.find({ studentId: user.userId })
-        .populate("studentId", "name rollNumber email")
+        .populate("studentId", "name rollNumber semester email")
         .populate("facultyId", "name email")
         .sort({ createdAt: -1 })
     }
 
-    return NextResponse.json({ projects })
+    // Map projects to include studentName, studentRoll, studentSemester, project (title)
+    const mappedProjects = projects.map((proj: any) => ({
+      _id: proj._id,
+      studentId: proj.studentId?._id,
+      studentName: proj.studentId?.name || "",
+      studentRoll: proj.studentId?.rollNumber || "",
+      studentSemester: proj.studentId?.semester || "",
+      project: proj.name || proj.project || "",
+      status: proj.status,
+      description: proj.description,
+      techStack: proj.techStack,
+      realLifeApplication: proj.realLifeApplication,
+      expectedCompletion: proj.expectedCompletionDate || proj.expectedCompletion || "",
+      feedback: proj.feedback || [],
+      facultyId: proj.facultyId?._id,
+      facultyName: proj.facultyId?.name || "",
+      facultyEmail: proj.facultyId?.email || "",
+      createdAt: proj.createdAt,
+      updatedAt: proj.updatedAt,
+    }))
+
+    return NextResponse.json({ projects: mappedProjects })
   } catch (error) {
     console.error("Get projects error:", error)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

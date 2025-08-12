@@ -21,9 +21,11 @@ interface FeedbackItem {
 }
 
 interface Project {
-  _id: string  // Change from 'id' to '_id' to match MongoDB
+  _id: string
   studentId: string
   studentName: string
+  studentRoll?: string         // <-- Add roll number
+  studentSemester?: string     // <-- Add semester
   project: string
   status: 'pending' | 'in_review' | 'approved' | 'rejected'
   description: string
@@ -113,28 +115,38 @@ export default function ProjectReview() {
   }
 
   const ProjectCard = ({ project }: { project: Project }) => (
-    <Card 
-      className="cursor-pointer hover:shadow-md transition-shadow" 
-      onClick={() => {
-        console.log('Selected project:', project) // Add this for debugging
-        setSelectedProject(project)
-      }}
+    <Card
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={() => setSelectedProject(project)}
     >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium">{project.studentName}</h4>
-            <p className="text-sm text-gray-600">{project.project}</p>
+            <div className="font-semibold text-lg">{project.project}</div>
+            <div className="text-sm text-gray-700 mt-1">
+              <span className="font-medium">Student:</span> {project.studentName}
+            </div>
+            {project.studentRoll && (
+              <div className="text-sm text-gray-700">
+                <span className="font-medium">Roll:</span> {project.studentRoll}
+              </div>
+            )}
+            {project.studentSemester && (
+              <div className="text-sm text-gray-700">
+                <span className="font-medium">Semester:</span> {project.studentSemester}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-2">
             <Badge variant={
               project.status === 'approved' ? 'default' :
               project.status === 'rejected' ? 'destructive' :
-              project.status === 'pending' ? 'secondary' :
               'secondary'
             }>
               {project.status}
             </Badge>
+            <Eye className="h-4 w-4 text-gray-400 mt-2" />
           </div>
-          <Eye className="h-4 w-4 text-gray-400" />
         </div>
       </CardContent>
     </Card>
@@ -149,13 +161,8 @@ export default function ProjectReview() {
   }
 
   // Add console logging to debug
-  const filterProjects = (status: Project['status']) => {
-    console.log('Filtering for status:', status)
-    console.log('All projects:', projects)
-    const filtered = projects.filter(project => project.status === status)
-    console.log('Filtered projects:', filtered)
-    return filtered
-  }
+  const filterProjects = (status: Project['status']) =>
+    projects.filter(project => project.status === status)
 
   const FeedbackHistory = ({ feedback }: { feedback: FeedbackItem[] }) => (
     <div className="space-y-4">
@@ -184,6 +191,14 @@ export default function ProjectReview() {
       )}
     </div>
   )
+
+  // Utility function to format date
+  function formatDate(dateString?: string) {
+    if (!dateString) return ""
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return dateString // fallback if invalid
+    return date.toISOString().slice(0, 10)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -285,55 +300,71 @@ export default function ProjectReview() {
               </div>
 
               <div>
-                <h4 className="font-medium mb-2">Expected Completion</h4>
-                <p className="text-sm text-gray-600">{selectedProject.expectedCompletion}</p>
+                <span className="font-bold">Expected Completion</span>
+                <div className="text-gray-600">
+                  {formatDate(selectedProject?.expectedCompletion)}
+                </div>
               </div>
 
               <FeedbackHistory feedback={selectedProject.feedback || []} />
 
-              <div>
-                <h4 className="font-medium mb-2">Provide Feedback</h4>
-                <Textarea
-                  placeholder="Enter your feedback here..."
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  className="min-h-24"
-                  disabled={isSubmitting}
-                />
-              </div>
+              {/* Only show feedback form if project is pending or in_review */}
+              {(selectedProject.status === "pending" || selectedProject.status === "in_review") && (
+                <>
+                  <div>
+                    <h4 className="font-medium mb-2">Provide Feedback</h4>
+                    <Textarea
+                      placeholder="Enter your feedback here..."
+                      value={feedback}
+                      onChange={(e) => setFeedback(e.target.value)}
+                      className="min-h-24"
+                      disabled={isSubmitting}
+                    />
+                  </div>
 
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => handleProjectAction('approve')} 
-                  className="flex-1"
-                  variant="default"
-                  disabled={isSubmitting || !feedback.trim()}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Approve Project
-                </Button>
-                
-                <Button 
-                  onClick={() => handleProjectAction('reject')} 
-                  className="flex-1"
-                  variant="destructive"
-                  disabled={isSubmitting || !feedback.trim()}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <XCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Request Changes
-                </Button>
-                <Button variant="outline" onClick={() => setSelectedProject(null)}>
-                  Close
-                </Button>
-              </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => handleProjectAction('approve')} 
+                      className="flex-1"
+                      variant="default"
+                      disabled={isSubmitting || !feedback.trim()}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Approve Project
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => handleProjectAction('reject')} 
+                      className="flex-1"
+                      variant="destructive"
+                      disabled={isSubmitting || !feedback.trim()}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Request Changes
+                    </Button>
+                    <Button variant="outline" onClick={() => setSelectedProject(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {/* Always show Close button */}
+              {(selectedProject.status === "approved" || selectedProject.status === "rejected") && (
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => setSelectedProject(null)}>
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
