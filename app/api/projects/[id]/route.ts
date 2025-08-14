@@ -1,5 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server"
-import connectDB from "@/lib/mongodb"
+import { NextRequest, NextResponse } from "next/server"
+import dbConnect from "@/lib/mongodb"
 import Project from "@/lib/models/Project"
 import jwt from "jsonwebtoken"
 
@@ -21,9 +21,9 @@ async function verifyToken(request: NextRequest) {
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await verifyToken(request)
-    await connectDB()
+    await dbConnect()
 
-    const { status, progress } = await request.json()
+    const body = await request.json()
     const projectId = params.id
 
     const project = await Project.findById(projectId)
@@ -41,12 +41,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     // Update fields based on user role
-    if (user.role === "faculty" && status) {
-      project.status = status
+    if (user.role === "faculty") {
+      if (body.status) project.status = body.status
+      if (body.evaluation) project.evaluation = body.evaluation
+      if (body.score !== undefined) project.score = body.score
+      if (body.grade) project.grade = body.grade
+      if (body.comments) project.comments = body.comments
+      if (body.recommendations) project.recommendations = body.recommendations
     }
 
-    if (user.role === "student" && progress !== undefined) {
-      project.progress = progress
+    if (user.role === "student" && body.progress !== undefined) {
+      project.progress = body.progress
     }
 
     await project.save()
@@ -57,5 +62,20 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   } catch (error) {
     console.error("Update project error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  await dbConnect()
+  const { id } = params
+
+  try {
+    const project = await Project.findById(id)
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 })
+    }
+    return NextResponse.json(project)
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch project" }, { status: 500 })
   }
 }

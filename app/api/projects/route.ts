@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
       updatedAt: proj.updatedAt,
     }))
 
-    return NextResponse.json({ projects: mappedProjects })
+    // Make sure each project includes the progress field
+    return NextResponse.json({ projects }) // projects should have .progress
   } catch (error) {
     console.error("Get projects error:", error)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

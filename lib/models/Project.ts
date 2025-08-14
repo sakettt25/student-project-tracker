@@ -75,6 +75,11 @@ const projectSchema = new mongoose.Schema(
       max: 100,
     },
     feedback: [FeedbackSchema],
+    evaluation: { type: Object, default: {} },
+    score: { type: Number },
+    grade: { type: String },
+    comments: { type: String },
+    recommendations: { type: String },
   },
   {
     timestamps: true,

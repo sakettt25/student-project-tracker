@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/auth"
 import { StudentNavbar } from "@/components/student-navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Plus, Eye, MessageSquare } from "lucide-react"
 
 export default function StudentProjects() {
+  const { token } = useAuth()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<any>(null)
   const [projectForm, setProjectForm] = useState({
@@ -31,87 +31,72 @@ export default function StudentProjects() {
     realLifeApplication: "",
     expectedCompletion: "",
   })
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data
-  const projects = {
-    inReview: [
-      {
-        id: 1,
-        name: "E-commerce Platform",
-        description: "A full-stack e-commerce platform with payment integration",
-        techStack: "React, Node.js, MongoDB, Stripe",
-        status: "in_review",
-        submittedDate: "2024-01-10",
-        feedback: [
-          {
-            message: "Great work on the user interface! Consider adding more error handling for the payment flow.",
-            date: "2024-01-12",
-            faculty: "Dr. John Smith",
+  // Fetch projects for the logged-in student
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!token) return
+      setLoading(true)
+      try {
+        const response = await fetch("/api/projects", {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        ],
-      },
-      {
-        id: 2,
-        name: "Social Media App",
-        description: "A social media application with real-time messaging",
-        techStack: "Vue.js, Express.js, Socket.io",
-        status: "in_review",
-        submittedDate: "2024-01-08",
-        feedback: [],
-      },
-    ],
-    pending: [
-      {
-        id: 3,
-        name: "Weather Dashboard",
-        description: "Real-time weather monitoring dashboard",
-        techStack: "React, Python, FastAPI",
-        status: "pending",
-        submittedDate: "2024-01-15",
-        feedback: [],
-      },
-    ],
-    approved: [
-      {
-        id: 4,
-        name: "Task Management App",
-        description: "A collaborative task management application",
-        techStack: "Vue.js, Express.js, PostgreSQL",
-        status: "approved",
-        submittedDate: "2024-01-05",
-        approvedDate: "2024-01-07",
-        feedback: [
-          {
-            message: "Excellent implementation! The user experience is smooth and the code is well-structured.",
-            date: "2024-01-07",
-            faculty: "Dr. John Smith",
-          },
-        ],
-      },
-      {
-        id: 5,
-        name: "Portfolio Website",
-        description: "Personal portfolio website with blog functionality",
-        techStack: "Next.js, Tailwind CSS, MDX",
-        status: "approved",
-        submittedDate: "2024-01-01",
-        approvedDate: "2024-01-03",
-        feedback: [],
-      },
-    ],
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setProjects(data.projects)
+        }
+      } catch (error) {
+        console.error("Failed to fetch projects:", error)
+      }
+      setLoading(false)
+    }
+    fetchProjects()
+  }, [token])
+
+  // Group projects by status
+  const groupedProjects = {
+    inReview: projects.filter((p) => p.status === "in_review"),
+    pending: projects.filter((p) => p.status === "pending"),
+    approved: projects.filter((p) => p.status === "approved"),
   }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Project submitted:", projectForm)
-    setProjectForm({
-      name: "",
-      description: "",
-      techStack: "",
-      realLifeApplication: "",
-      expectedCompletion: "",
-    })
-    setIsDialogOpen(false)
+    if (!token) return
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: projectForm.name,
+          description: projectForm.description,
+          techStack: projectForm.techStack,
+          realLifeApplication: projectForm.realLifeApplication,
+          expectedCompletionDate: projectForm.expectedCompletion,
+        }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProjects([data.project, ...projects])
+        setProjectForm({
+          name: "",
+          description: "",
+          techStack: "",
+          realLifeApplication: "",
+          expectedCompletion: "",
+        })
+        setIsDialogOpen(false)
+      }
+    } catch (error) {
+      console.error("Project submission failed:", error)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -126,6 +111,8 @@ export default function StudentProjects() {
         return <Badge className="bg-blue-100 text-blue-800">In Review</Badge>
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+      case "rejected":
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
       default:
         return <Badge variant="secondary">Unknown</Badge>
     }
@@ -136,13 +123,15 @@ export default function StudentProjects() {
       <CardContent className="p-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium">{project.name}</h4>
+            <h4 className="font-medium">{project.name || project.project}</h4>
             <Eye className="h-4 w-4 text-gray-400" />
           </div>
           <p className="text-sm text-gray-600 line-clamp-2">{project.description}</p>
           <div className="flex items-center justify-between">
             {getStatusBadge(project.status)}
-            <span className="text-xs text-gray-500">{project.submittedDate}</span>
+            <span className="text-xs text-gray-500">
+              {formatDate(project.createdAt || project.submittedDate)}
+            </span>
           </div>
           {project.feedback && project.feedback.length > 0 && (
             <div className="flex items-center gap-1 text-xs text-blue-600">
@@ -154,6 +143,13 @@ export default function StudentProjects() {
       </CardContent>
     </Card>
   )
+
+  function formatDate(dateString?: string) {
+    if (!dateString) return ""
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return dateString
+    return date.toISOString().slice(0, 10)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -260,16 +256,22 @@ export default function StudentProjects() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   In Review
-                  <Badge variant="secondary">{projects.inReview.length}</Badge>
+                  <Badge variant="secondary">{groupedProjects.inReview.length}</Badge>
                 </CardTitle>
                 <CardDescription>Projects being reviewed by faculty</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projects.inReview.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => setSelectedProject(project)} />
-                    ))}
+                    {loading ? (
+                      <div className="text-gray-400">Loading...</div>
+                    ) : groupedProjects.inReview.length === 0 ? (
+                      <div className="text-gray-400">No projects in review</div>
+                    ) : (
+                      groupedProjects.inReview.map((project) => (
+                        <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -280,16 +282,22 @@ export default function StudentProjects() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Pending
-                  <Badge variant="secondary">{projects.pending.length}</Badge>
+                  <Badge variant="secondary">{groupedProjects.pending.length}</Badge>
                 </CardTitle>
                 <CardDescription>Projects awaiting review</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projects.pending.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => setSelectedProject(project)} />
-                    ))}
+                    {loading ? (
+                      <div className="text-gray-400">Loading...</div>
+                    ) : groupedProjects.pending.length === 0 ? (
+                      <div className="text-gray-400">No pending projects</div>
+                    ) : (
+                      groupedProjects.pending.map((project) => (
+                        <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -300,16 +308,22 @@ export default function StudentProjects() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Approved
-                  <Badge variant="secondary">{projects.approved.length}</Badge>
+                  <Badge variant="secondary">{groupedProjects.approved.length}</Badge>
                 </CardTitle>
                 <CardDescription>Successfully approved projects</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projects.approved.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => setSelectedProject(project)} />
-                    ))}
+                    {loading ? (
+                      <div className="text-gray-400">Loading...</div>
+                    ) : groupedProjects.approved.length === 0 ? (
+                      <div className="text-gray-400">No approved projects</div>
+                    ) : (
+                      groupedProjects.approved.map((project) => (
+                        <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -322,7 +336,7 @@ export default function StudentProjects() {
       <Dialog open={!!selectedProject} onOpenChange={() => setSelectedProject(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedProject?.name}</DialogTitle>
+            <DialogTitle>{selectedProject?.name || selectedProject?.project}</DialogTitle>
             <DialogDescription>Project details and feedback</DialogDescription>
           </DialogHeader>
 
@@ -330,9 +344,13 @@ export default function StudentProjects() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 {getStatusBadge(selectedProject.status)}
-                <span className="text-sm text-gray-500">Submitted: {selectedProject.submittedDate}</span>
+                <span className="text-sm text-gray-500">
+                  Submitted: {formatDate(selectedProject.createdAt || selectedProject.submittedDate)}
+                </span>
                 {selectedProject.approvedDate && (
-                  <span className="text-sm text-green-600">Approved: {selectedProject.approvedDate}</span>
+                  <span className="text-sm text-green-600">
+                    Approved: {formatDate(selectedProject.approvedDate)}
+                  </span>
                 )}
               </div>
 
@@ -346,22 +364,48 @@ export default function StudentProjects() {
                 <p className="text-sm text-gray-600">{selectedProject.techStack}</p>
               </div>
 
-              {selectedProject.feedback && selectedProject.feedback.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Faculty Feedback</h4>
+              <div>
+                <h4 className="font-medium mb-2">Real-life Application</h4>
+                <p className="text-sm text-gray-600">{selectedProject.realLifeApplication}</p>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Faculty Feedback</h4>
+                {selectedProject.feedback && selectedProject.feedback.length > 0 ? (
                   <div className="space-y-3">
                     {selectedProject.feedback.map((feedback: any, index: number) => (
                       <div key={index} className="bg-gray-50 p-3 rounded border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-sm">
+                            {feedback.facultyName || feedback.faculty || "Faculty"}
+                          </span>
+                          <span
+                            className={
+                              feedback.action === "approve"
+                                ? "text-green-600 text-xs"
+                                : feedback.action === "reject"
+                                ? "text-red-600 text-xs"
+                                : "text-gray-500 text-xs"
+                            }
+                          >
+                            {feedback.action === "approve"
+                              ? "Approved"
+                              : feedback.action === "reject"
+                              ? "Rejected"
+                              : ""}
+                          </span>
+                        </div>
                         <p className="text-sm text-gray-700">{feedback.message}</p>
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                          <span>{feedback.faculty}</span>
-                          <span>{feedback.date}</span>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {formatDate(feedback.createdAt || feedback.date)}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-gray-500 text-sm">No feedback yet</div>
+                )}
+              </div>
 
               <Button onClick={() => setSelectedProject(null)} className="w-full">
                 Close
