@@ -98,24 +98,21 @@ export default function FacultyEvaluation() {
             const projectDetail = await resProjectDetail.json()
             // Only include projects with 100% progress
             if (projectDetail.progress === 100) {
+              // Force status to "ready_for_evaluation" if not evaluated
+              let status = project.status;
+              if (status !== "evaluated") status = "ready_for_evaluation";
               allProjects.push({
                 id: student._id,
                 name: student.name,
                 rollNumber: student.rollNumber,
                 projectId: project._id,
                 project: project.name,
-                status: project.status,
+                status,
                 submissionDate: projectDetail.finalSubmissionDate
                   ? projectDetail.finalSubmissionDate.slice(0, 10)
                   : (project.submissionDate?.slice(0, 10) || ""),
-                grade:
-                  project.grade ??
-                  projectDetail.evaluation?.grade ??
-                  projectDetail.evaluation?.grade,
-                score:
-                  typeof project.score === "number"
-                    ? project.score
-                    : projectDetail.evaluation?.totalScore,
+                grade: projectDetail.evaluation?.grade ?? project.grade ?? "",
+                score: projectDetail.evaluation?.totalScore ?? project.score ?? 0,
                 evaluation: projectDetail.evaluation
                   ? {
                       criteriaScores: Object.fromEntries(
@@ -125,13 +122,8 @@ export default function FacultyEvaluation() {
                       ),
                       comments: projectDetail.evaluation.comments || "",
                       recommendations: projectDetail.evaluation.recommendations || "",
-                      totalScore:
-                        projectDetail.evaluation.totalScore ??
-                        (typeof project.score === "number" ? project.score : 0),
-                      grade:
-                        projectDetail.evaluation.grade ??
-                        project.grade ??
-                        "",
+                      totalScore: projectDetail.evaluation.totalScore ?? 0,
+                      grade: projectDetail.evaluation.grade ?? "",
                       evaluatedAt: projectDetail.evaluation.evaluatedAt,
                     }
                   : undefined,
