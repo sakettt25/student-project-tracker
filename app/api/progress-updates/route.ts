@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import ProgressUpdate from "@/lib/models/ProgressUpdate"
+import Project from "@/lib/models/Project"
 import jwt from "jsonwebtoken"
 
 async function verifyToken(request: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only students can add progress updates" }, { status: 403 })
     }
 
-    const { projectId, updateText, date } = await request.json()
+    const { projectId, updateText, date, progress } = await request.json()
 
     const newUpdate = new ProgressUpdate({
       projectId,
@@ -59,6 +60,16 @@ export async function POST(request: NextRequest) {
 
     await newUpdate.save()
     await newUpdate.populate("studentId", "name rollNumber")
+
+    if (typeof progress === "number") {
+      // Get current project progress
+      const project = await Project.findById(projectId)
+      if (project) {
+        let newProgress = (project.progress ?? 0) + progress
+        if (newProgress > 100) newProgress = 100
+        await Project.findByIdAndUpdate(projectId, { progress: newProgress })
+      }
+    }
 
     return NextResponse.json({ update: newUpdate })
   } catch (error) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { StudentNavbar } from "@/components/student-navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,82 +16,137 @@ import {
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { Calendar, Plus, CheckCircle, Clock } from "lucide-react"
+import { useAuth } from "@/lib/auth"
+import { Input } from "@/components/ui/input"
+
+interface ProgressUpdate {
+  _id: string
+  updateText: string
+  date: string
+  createdAt: string
+}
+
+interface Project {
+  _id: string
+  name: string
+  description: string
+  techStack: string
+  approvedDate?: string
+  expectedCompletionDate: string
+  progress: number
+  status: string
+  updates: ProgressUpdate[]
+}
 
 export default function StudentProgress() {
-  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const { user, token } = useAuth()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [newUpdate, setNewUpdate] = useState("")
+  const [newProgress, setNewProgress] = useState<number | "">("")
+  const [submitting, setSubmitting] = useState(false)
+  const [showAllUpdatesProject, setShowAllUpdatesProject] = useState<Project | null>(null)
 
-  // Mock data - only approved projects
-  const approvedProjects = [
-    {
-      id: 1,
-      name: "Task Management App",
-      description: "A collaborative task management application",
-      techStack: "Vue.js, Express.js, PostgreSQL",
-      approvedDate: "2024-01-07",
-      expectedCompletion: "2024-02-15",
-      progress: 85,
-      updates: [
-        {
-          date: "2024-01-15",
-          update:
-            "Completed user authentication and authorization system. Started working on task creation and assignment features.",
-        },
-        {
-          date: "2024-01-14",
-          update: "Set up the database schema and implemented basic CRUD operations for users and tasks.",
-        },
-        {
-          date: "2024-01-13",
-          update:
-            "Initialized the project structure and set up the development environment with Vue.js and Express.js.",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Portfolio Website",
-      description: "Personal portfolio website with blog functionality",
-      techStack: "Next.js, Tailwind CSS, MDX",
-      approvedDate: "2024-01-03",
-      expectedCompletion: "2024-01-30",
-      progress: 100,
-      updates: [
-        {
-          date: "2024-01-12",
-          update: "Website is now live! Added final touches to the blog section and optimized for SEO.",
-        },
-        {
-          date: "2024-01-10",
-          update: "Completed the portfolio section with project showcases and integrated contact form.",
-        },
-        {
-          date: "2024-01-08",
-          update: "Finished the responsive design and added dark mode toggle functionality.",
-        },
-      ],
-    },
-  ]
+  // Fetch approved projects and their progress updates
+  useEffect(() => {
+    if (!token) return
 
-  const handleUpdateSubmit = () => {
-    if (!newUpdate.trim()) return
+    const fetchProjects = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch("/api/projects", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const data = await res.json()
+        // Only approved projects
+        const approved = data.projects.filter((p: any) => p.status === "approved")
+        // Fetch progress updates for each project
+        const projectsWithUpdates = await Promise.all(
+          approved.map(async (proj: any) => {
+            const resUpdates = await fetch(`/api/progress-updates?projectId=${proj._id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            const updatesData = await resUpdates.json()
+            return {
+              _id: proj._id,
+              name: proj.name,
+              description: proj.description,
+              techStack: proj.techStack,
+              approvedDate: proj.updatedAt ? proj.updatedAt.slice(0, 10) : "",
+              expectedCompletionDate: proj.expectedCompletion,
+              progress: proj.progress ?? 0,
+              status: proj.status,
+              updates: updatesData.updates || [],
+            }
+          })
+        )
+        setProjects(projectsWithUpdates)
+      } catch (err) {
+        setProjects([])
+      }
+      setLoading(false)
+    }
 
-    // In real app, this would submit to API
-    console.log("Progress update submitted:", {
-      projectId: selectedProject.id,
-      update: newUpdate,
-      date: new Date().toISOString().split("T")[0],
-    })
+    fetchProjects()
+  }, [token])
 
-    setNewUpdate("")
-    setSelectedProject(null)
+  const handleUpdateSubmit = async () => {
+    if (!newUpdate.trim() || !selectedProject || !token || newProgress === "") return
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/progress-updates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          projectId: selectedProject._id,
+          updateText: newUpdate,
+          progress: Number(newProgress),
+        }),
+      })
+      if (res.ok) {
+        // Fetch the latest project info after update
+        const resProject = await fetch(`/api/projects/${selectedProject._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const projectData = await resProject.json()
+
+        // Fetch the latest updates for this project
+        const resUpdates = await fetch(`/api/progress-updates?projectId=${selectedProject._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const updatesData = await resUpdates.json()
+
+        setProjects((prev) =>
+          prev.map((p) =>
+            p._id === selectedProject._id
+              ? {
+                  ...p,
+                  updates: updatesData.updates || [],
+                  progress: projectData.progress ?? 0, // <-- Use backend value
+                }
+              : p
+          )
+        )
+        setNewUpdate("")
+        setNewProgress("")
+        setSelectedProject(null)
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const getProgressColor = (progress: number) => {
-    if (progress === 100) return "bg-green-500"
-    if (progress >= 75) return "bg-blue-500"
-    if (progress >= 50) return "bg-yellow-500"
-    return "bg-red-500"
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <StudentNavbar />
+        <div className="max-w-7xl mx-auto py-12 text-center text-gray-500">Loading...</div>
+      </div>
+    )
   }
 
   return (
@@ -112,7 +167,7 @@ export default function StudentProgress() {
                 <Clock className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{approvedProjects.filter((p) => p.progress < 100).length}</div>
+                <div className="text-2xl font-bold">{projects.filter((p) => p.progress < 100).length}</div>
                 <p className="text-xs text-muted-foreground">Currently in progress</p>
               </CardContent>
             </Card>
@@ -123,7 +178,7 @@ export default function StudentProgress() {
                 <CheckCircle className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{approvedProjects.filter((p) => p.progress === 100).length}</div>
+                <div className="text-2xl font-bold">{projects.filter((p) => p.progress === 100).length}</div>
                 <p className="text-xs text-muted-foreground">Successfully finished</p>
               </CardContent>
             </Card>
@@ -135,7 +190,10 @@ export default function StudentProgress() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {Math.round(approvedProjects.reduce((acc, p) => acc + p.progress, 0) / approvedProjects.length)}%
+                  {projects.length > 0
+                    ? Math.round(projects.reduce((acc, p) => acc + (p.progress || 0), 0) / projects.length)
+                    : 0}
+                  %
                 </div>
                 <p className="text-xs text-muted-foreground">Across all projects</p>
               </CardContent>
@@ -144,8 +202,8 @@ export default function StudentProgress() {
 
           {/* Project Progress Cards */}
           <div className="space-y-6">
-            {approvedProjects.map((project) => (
-              <Card key={project.id}>
+            {projects.map((project) => (
+              <Card key={project._id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -177,7 +235,7 @@ export default function StudentProgress() {
                       <span className="font-medium">Approved:</span> {project.approvedDate}
                     </div>
                     <div>
-                      <span className="font-medium">Expected Completion:</span> {project.expectedCompletion}
+                      <span className="font-medium">Expected Completion:</span> {project.expectedCompletionDate}
                     </div>
                   </div>
 
@@ -194,7 +252,16 @@ export default function StudentProgress() {
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-medium">Recent Updates</h4>
-                      <Dialog>
+                      <Dialog
+                        open={selectedProject?._id === project._id}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setSelectedProject(null)
+                            setNewUpdate("")
+                            setNewProgress("")
+                          }
+                        }}
+                      >
                         <DialogTrigger asChild>
                           <Button
                             size="sm"
@@ -220,11 +287,40 @@ export default function StudentProgress() {
                                 className="mt-1 min-h-24"
                               />
                             </div>
+                            <div>
+                              <label className="text-sm font-medium">Add Progress (%)</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={100 - project.progress}
+                                value={newProgress}
+                                onChange={(e) =>
+                                  setNewProgress(
+                                    e.target.value === ""
+                                      ? ""
+                                      : Math.max(1, Math.min(100 - project.progress, Number(e.target.value)))
+                                  )
+                                }
+                                placeholder={`Add progress (max ${100 - project.progress})`}
+                                className="mt-1"
+                              />
+                            </div>
                             <div className="flex gap-2">
-                              <Button onClick={handleUpdateSubmit} className="flex-1">
-                                Submit Update
+                              <Button
+                                onClick={handleUpdateSubmit}
+                                className="flex-1"
+                                disabled={submitting || newUpdate.trim() === "" || newProgress === ""}
+                              >
+                                {submitting ? "Submitting..." : "Submit Update"}
                               </Button>
-                              <Button variant="outline" onClick={() => setSelectedProject(null)}>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedProject(null)
+                                  setNewUpdate("")
+                                  setNewProgress("")
+                                }}
+                              >
                                 Cancel
                               </Button>
                             </div>
@@ -235,13 +331,20 @@ export default function StudentProgress() {
 
                     <div className="space-y-3 max-h-48 overflow-y-auto">
                       {project.updates.slice(0, 3).map((update, index) => (
-                        <div key={index} className="bg-gray-50 p-3 rounded border">
-                          <p className="text-sm text-gray-700">{update.update}</p>
-                          <p className="text-xs text-gray-500 mt-1">{update.date}</p>
+                        <div key={update._id || index} className="bg-gray-50 p-3 rounded border">
+                          <p className="text-sm text-gray-700">{update.updateText}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {update.date ? update.date.slice(0, 10) : ""}
+                          </p>
                         </div>
                       ))}
                       {project.updates.length > 3 && (
-                        <Button variant="ghost" size="sm" className="w-full">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowAllUpdatesProject(project)}
+                        >
                           View all {project.updates.length} updates
                         </Button>
                       )}
@@ -252,7 +355,7 @@ export default function StudentProgress() {
             ))}
           </div>
 
-          {approvedProjects.length === 0 && (
+          {projects.length === 0 && (
             <Card>
               <CardContent className="text-center py-12">
                 <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -263,6 +366,30 @@ export default function StudentProgress() {
               </CardContent>
             </Card>
           )}
+
+          {/* View All Updates Dialog */}
+          <Dialog open={!!showAllUpdatesProject} onOpenChange={() => setShowAllUpdatesProject(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  All Updates for "{showAllUpdatesProject?.name}"
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {showAllUpdatesProject?.updates.map((update, idx) => (
+                  <div key={update._id || idx} className="bg-gray-50 p-3 rounded border">
+                    <p className="text-sm text-gray-700">{update.updateText}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {update.date ? update.date.slice(0, 10) : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <Button className="mt-4 w-full" onClick={() => setShowAllUpdatesProject(null)}>
+                Close
+              </Button>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

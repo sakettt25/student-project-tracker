@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/auth"
 import { StudentNavbar } from "@/components/student-navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Plus, Eye, MessageSquare } from "lucide-react"
 
 export default function StudentProjects() {
+  const { token } = useAuth()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<any>(null)
   const [projectForm, setProjectForm] = useState({
@@ -31,87 +31,88 @@ export default function StudentProjects() {
     realLifeApplication: "",
     expectedCompletion: "",
   })
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data
-  const projects = {
-    inReview: [
-      {
-        id: 1,
-        name: "E-commerce Platform",
-        description: "A full-stack e-commerce platform with payment integration",
-        techStack: "React, Node.js, MongoDB, Stripe",
-        status: "in_review",
-        submittedDate: "2024-01-10",
-        feedback: [
-          {
-            message: "Great work on the user interface! Consider adding more error handling for the payment flow.",
-            date: "2024-01-12",
-            faculty: "Dr. John Smith",
+  // Fetch projects for the logged-in student
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!token) return
+      setLoading(true)
+      try {
+        const response = await fetch("/api/projects", {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        ],
-      },
-      {
-        id: 2,
-        name: "Social Media App",
-        description: "A social media application with real-time messaging",
-        techStack: "Vue.js, Express.js, Socket.io",
-        status: "in_review",
-        submittedDate: "2024-01-08",
-        feedback: [],
-      },
-    ],
-    pending: [
-      {
-        id: 3,
-        name: "Weather Dashboard",
-        description: "Real-time weather monitoring dashboard",
-        techStack: "React, Python, FastAPI",
-        status: "pending",
-        submittedDate: "2024-01-15",
-        feedback: [],
-      },
-    ],
-    approved: [
-      {
-        id: 4,
-        name: "Task Management App",
-        description: "A collaborative task management application",
-        techStack: "Vue.js, Express.js, PostgreSQL",
-        status: "approved",
-        submittedDate: "2024-01-05",
-        approvedDate: "2024-01-07",
-        feedback: [
-          {
-            message: "Excellent implementation! The user experience is smooth and the code is well-structured.",
-            date: "2024-01-07",
-            faculty: "Dr. John Smith",
-          },
-        ],
-      },
-      {
-        id: 5,
-        name: "Portfolio Website",
-        description: "Personal portfolio website with blog functionality",
-        techStack: "Next.js, Tailwind CSS, MDX",
-        status: "approved",
-        submittedDate: "2024-01-01",
-        approvedDate: "2024-01-03",
-        feedback: [],
-      },
-    ],
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setProjects(data.projects)
+        }
+      } catch (error) {
+        console.error("Failed to fetch projects:", error)
+      }
+      setLoading(false)
+    }
+    fetchProjects()
+  }, [token])
+
+  // Group projects by status
+  const groupedProjects = {
+    rejected: projects.filter((p) => p.status === "rejected"),
+    pending: projects.filter((p) => p.status === "pending"),
+    approved: projects.filter((p) => p.status === "approved"),
   }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Project submitted:", projectForm)
-    setProjectForm({
-      name: "",
-      description: "",
-      techStack: "",
-      realLifeApplication: "",
-      expectedCompletion: "",
-    })
-    setIsDialogOpen(false)
+    if (!token) {
+      setError("Authentication required. Please log in again.")
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: projectForm.name,
+          description: projectForm.description,
+          techStack: projectForm.techStack,
+          realLifeApplication: projectForm.realLifeApplication,
+          expectedCompletionDate: projectForm.expectedCompletion,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Failed to submit project" }))
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      setProjects([data.project, ...projects])
+      setProjectForm({
+        name: "",
+        description: "",
+        techStack: "",
+        realLifeApplication: "",
+        expectedCompletion: "",
+      })
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error("Project submission failed:", error)
+      setError(error instanceof Error ? error.message : "Failed to submit project")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -126,6 +127,8 @@ export default function StudentProjects() {
         return <Badge className="bg-blue-100 text-blue-800">In Review</Badge>
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+      case "rejected":
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
       default:
         return <Badge variant="secondary">Unknown</Badge>
     }
@@ -136,13 +139,15 @@ export default function StudentProjects() {
       <CardContent className="p-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium">{project.name}</h4>
+            <h4 className="font-medium">{project.name || project.project}</h4>
             <Eye className="h-4 w-4 text-gray-400" />
           </div>
           <p className="text-sm text-gray-600 line-clamp-2">{project.description}</p>
           <div className="flex items-center justify-between">
             {getStatusBadge(project.status)}
-            <span className="text-xs text-gray-500">{project.submittedDate}</span>
+            <span className="text-xs text-gray-500">
+              {formatDate(project.createdAt || project.submittedDate)}
+            </span>
           </div>
           {project.feedback && project.feedback.length > 0 && (
             <div className="flex items-center gap-1 text-xs text-blue-600">
@@ -154,6 +159,13 @@ export default function StudentProjects() {
       </CardContent>
     </Card>
   )
+
+  function formatDate(dateString?: string) {
+    if (!dateString) return ""
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return dateString
+    return date.toISOString().slice(0, 10)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,6 +201,11 @@ export default function StudentProjects() {
                       <DialogDescription>Fill in the details for your new project submission</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleFormSubmit} className="space-y-4">
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                          {error}
+                        </div>
+                      )}
                       <div>
                         <Label htmlFor="projectName">Project Name</Label>
                         <Input
@@ -197,6 +214,7 @@ export default function StudentProjects() {
                           onChange={(e) => handleInputChange("name", e.target.value)}
                           placeholder="Enter project name"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -208,6 +226,7 @@ export default function StudentProjects() {
                           placeholder="Describe your project"
                           className="min-h-24"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -218,6 +237,7 @@ export default function StudentProjects() {
                           onChange={(e) => handleInputChange("techStack", e.target.value)}
                           placeholder="e.g., React, Node.js, MongoDB"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -229,6 +249,7 @@ export default function StudentProjects() {
                           placeholder="How can this project be used in real life?"
                           className="min-h-20"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -239,13 +260,22 @@ export default function StudentProjects() {
                           value={projectForm.expectedCompletion}
                           onChange={(e) => handleInputChange("expectedCompletion", e.target.value)}
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          Submit Project
+                        <Button type="submit" className="flex-1" disabled={submitting}>
+                          {submitting ? "Submitting..." : "Submit Project"}
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsDialogOpen(false)
+                            setError(null)
+                          }}
+                          disabled={submitting}
+                        >
                           Cancel
                         </Button>
                       </div>
@@ -255,21 +285,27 @@ export default function StudentProjects() {
               </CardContent>
             </Card>
 
-            {/* Projects in Review */}
+            {/* Rejected Projects */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  In Review
-                  <Badge variant="secondary">{projects.inReview.length}</Badge>
+                  Rejected
+                  <Badge variant="destructive">{groupedProjects.rejected.length}</Badge>
                 </CardTitle>
-                <CardDescription>Projects being reviewed by faculty</CardDescription>
+                <CardDescription>Projects that need revision</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projects.inReview.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => setSelectedProject(project)} />
-                    ))}
+                    {loading ? (
+                      <div className="text-gray-400">Loading...</div>
+                    ) : groupedProjects.rejected.length === 0 ? (
+                      <div className="text-gray-400">No rejected projects</div>
+                    ) : (
+                      groupedProjects.rejected.map((project) => (
+                        <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -280,16 +316,22 @@ export default function StudentProjects() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Pending
-                  <Badge variant="secondary">{projects.pending.length}</Badge>
+                  <Badge variant="secondary">{groupedProjects.pending.length}</Badge>
                 </CardTitle>
                 <CardDescription>Projects awaiting review</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projects.pending.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => setSelectedProject(project)} />
-                    ))}
+                    {loading ? (
+                      <div className="text-gray-400">Loading...</div>
+                    ) : groupedProjects.pending.length === 0 ? (
+                      <div className="text-gray-400">No pending projects</div>
+                    ) : (
+                      groupedProjects.pending.map((project) => (
+                        <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -300,16 +342,22 @@ export default function StudentProjects() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Approved
-                  <Badge variant="secondary">{projects.approved.length}</Badge>
+                  <Badge className="bg-green-100 text-green-800">{groupedProjects.approved.length}</Badge>
                 </CardTitle>
                 <CardDescription>Successfully approved projects</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {projects.approved.map((project) => (
-                      <ProjectCard key={project.id} project={project} onClick={() => setSelectedProject(project)} />
-                    ))}
+                    {loading ? (
+                      <div className="text-gray-400">Loading...</div>
+                    ) : groupedProjects.approved.length === 0 ? (
+                      <div className="text-gray-400">No approved projects</div>
+                    ) : (
+                      groupedProjects.approved.map((project) => (
+                        <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -322,7 +370,7 @@ export default function StudentProjects() {
       <Dialog open={!!selectedProject} onOpenChange={() => setSelectedProject(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedProject?.name}</DialogTitle>
+            <DialogTitle>{selectedProject?.name || selectedProject?.project}</DialogTitle>
             <DialogDescription>Project details and feedback</DialogDescription>
           </DialogHeader>
 
@@ -330,9 +378,13 @@ export default function StudentProjects() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 {getStatusBadge(selectedProject.status)}
-                <span className="text-sm text-gray-500">Submitted: {selectedProject.submittedDate}</span>
+                <span className="text-sm text-gray-500">
+                  Submitted: {formatDate(selectedProject.createdAt || selectedProject.submittedDate)}
+                </span>
                 {selectedProject.approvedDate && (
-                  <span className="text-sm text-green-600">Approved: {selectedProject.approvedDate}</span>
+                  <span className="text-sm text-green-600">
+                    Approved: {formatDate(selectedProject.approvedDate)}
+                  </span>
                 )}
               </div>
 
@@ -346,22 +398,48 @@ export default function StudentProjects() {
                 <p className="text-sm text-gray-600">{selectedProject.techStack}</p>
               </div>
 
-              {selectedProject.feedback && selectedProject.feedback.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Faculty Feedback</h4>
+              <div>
+                <h4 className="font-medium mb-2">Real-life Application</h4>
+                <p className="text-sm text-gray-600">{selectedProject.realLifeApplication}</p>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Faculty Feedback</h4>
+                {selectedProject.feedback && selectedProject.feedback.length > 0 ? (
                   <div className="space-y-3">
                     {selectedProject.feedback.map((feedback: any, index: number) => (
                       <div key={index} className="bg-gray-50 p-3 rounded border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-sm">
+                            {feedback.facultyName || feedback.faculty || "Faculty"}
+                          </span>
+                          <span
+                            className={
+                              feedback.action === "approve"
+                                ? "text-green-600 text-xs"
+                                : feedback.action === "reject"
+                                ? "text-red-600 text-xs"
+                                : "text-gray-500 text-xs"
+                            }
+                          >
+                            {feedback.action === "approve"
+                              ? "Approved"
+                              : feedback.action === "reject"
+                              ? "Rejected"
+                              : ""}
+                          </span>
+                        </div>
                         <p className="text-sm text-gray-700">{feedback.message}</p>
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                          <span>{feedback.faculty}</span>
-                          <span>{feedback.date}</span>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {formatDate(feedback.createdAt || feedback.date)}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-gray-500 text-sm">No feedback yet</div>
+                )}
+              </div>
 
               <Button onClick={() => setSelectedProject(null)} className="w-full">
                 Close
