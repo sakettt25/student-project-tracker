@@ -8,11 +8,24 @@ export interface IProject extends mongoose.Document {
   techStack: string
   realLifeApplication: string
   expectedCompletionDate: Date
-  status: "pending" | "in_review" | "approved" | "rejected"
+  deadline?: Date  // Add this field
+  status: "pending" | "approved" | "rejected" | "evaluated"  // Fix enum values
   progress: number
   createdAt: Date
   updatedAt: Date
   feedback: IFeedback[]
+  evaluation?: {
+    criteriaScores: Map<string, number>
+    comments: string
+    recommendations: string
+    totalScore: number
+    grade: string
+    evaluatedAt: string
+  }
+  score?: number
+  grade?: string
+  comments?: string
+  recommendations?: string
 }
 
 export interface IFeedback {
@@ -33,57 +46,36 @@ const FeedbackSchema = new mongoose.Schema({
 
 const projectSchema = new mongoose.Schema(
   {
-    studentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+    studentId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    facultyId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    name: { type: String, required: true },
+    description: { type: String, required: true },
+    techStack: { type: String, required: true },
+    realLifeApplication: { type: String, required: true },
+    expectedCompletionDate: { type: Date, required: true },
+    deadline: { type: Date }, // Add deadline field (optional)
+    status: { 
+      type: String, 
+      enum: ["pending", "approved", "rejected", "evaluated"], // Fix enum values
+      default: "pending" 
     },
-    facultyId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+    progress: { type: Number, default: 0 },
+    evaluation: {
+      criteriaScores: { type: Map, of: Number },
+      comments: String,
+      recommendations: String,
+      totalScore: Number,
+      grade: String,
+      evaluatedAt: String,
     },
-    name: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    techStack: {
-      type: String,
-      required: true,
-    },
-    realLifeApplication: {
-      type: String,
-      required: true,
-    },
-    expectedCompletionDate: {
-      type: Date,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ["pending", "in_review", "approved", "rejected"],
-      default: "pending",
-    },
-    progress: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
-    },
-    feedback: [FeedbackSchema],
-    evaluation: { type: Object, default: {} },
+    // Add these fields for backward compatibility
     score: { type: Number },
     grade: { type: String },
     comments: { type: String },
     recommendations: { type: String },
+    feedback: [FeedbackSchema], // Use embedded schema instead of ref
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 )
 
 export default mongoose.models.Project || mongoose.model<IProject>("Project", projectSchema)

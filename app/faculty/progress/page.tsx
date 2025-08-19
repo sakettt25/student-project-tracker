@@ -34,60 +34,122 @@ export default function FacultyProgress() {
       if (!token || !user?.id) return
       setLoading(true)
       try {
-        // 1. Fetch students under this faculty
-        const resStudents = await fetch(`/api/faculty/${user.id}/students`, {
+        // Fetch all projects assigned to this faculty
+        const response = await fetch("/api/projects", {
           headers: { Authorization: `Bearer ${token}` },
         })
-        const studentsData = await resStudents.json()
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch projects")
+        }
 
-        // 2. For each student, fetch their projects
-        const studentsWithProjects = await Promise.all(
-          studentsData.map(async (student: any) => {
-            const resProjects = await fetch(`/api/students/${student._id}/projects`, {
-              headers: { Authorization: `Bearer ${token}` },
-            })
-            const projectsData = await resProjects.json()
+        const data = await response.json()
+        const projects = data.projects || []
 
-            // 3. For each project, fetch latest project info and ALL progress updates
-            const projectsWithProgress = await Promise.all(
-              projectsData.map(async (project: any) => {
-                // Fetch latest project info (for progress and status)
-                const resProject = await fetch(`/api/projects/${project._id}`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                })
-                const projectData = await resProject.json()
+        console.log("Fetched projects:", projects)
 
-                // Fetch ALL progress updates
-                const resUpdates = await fetch(`/api/progress-updates?projectId=${project._id}`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                })
-                const updatesData = await resUpdates.json()
-                const updates = updatesData.updates || []
-                const latestUpdate = updates[0] || null
-
-                return {
-                  name: projectData.name || project.name,
-                  status: projectData.progress === 100 ? "completed" : "in_progress",
-                  completion: projectData.progress ?? 0,
-                  lastUpdate: latestUpdate?.date ? latestUpdate.date.slice(0, 10) : "",
-                  eodUpdate: latestUpdate?.updateText || "",
-                  updates, // Store all updates
-                }
-              })
-            )
-
-            return {
-              id: student._id,
-              name: student.name,
-              rollNumber: student.rollNumber,
-              projects: projectsWithProgress,
-            }
-          })
+        // Filter projects that are approved or completed (not rejected or pending)
+        const approvedProjects = projects.filter((project: any) => 
+          project.status === "approved" || project.status === "completed" || 
+          (project.progress && project.progress > 0) // Include projects with progress
         )
 
-        setStudents(studentsWithProjects)
+        console.log("Approved/completed projects:", approvedProjects)
+
+        // Group projects by student
+        const studentProjectMap = new Map()
+
+        for (const project of approvedProjects) {
+          const studentId = project.studentId
+          const studentName = project.studentName || "Unknown Student"
+          const studentRoll = project.studentRoll || "Unknown Roll"
+
+          if (!studentProjectMap.has(studentId)) {
+            studentProjectMap.set(studentId, {
+              id: studentId,
+              name: studentName,
+              rollNumber: studentRoll,
+              projects: []
+            })
+          }
+
+          // Fetch progress updates for this project
+          try {
+            const updatesResponse = await fetch(`/api/progress-updates?projectId=${project._id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            
+            let updates = []
+            if (updatesResponse.ok) {
+              const updatesData = await updatesResponse.json()
+              updates = updatesData.updates || []
+            }
+
+            const latestUpdate = updates[0] || null
+            const progress = project.progress || 0
+
+            interface ProgressUpdate {
+              _id?: string
+              updateText: string
+              date: string
+            }
+
+            interface Project {
+              id: string
+              name: string
+              status: string
+              completion: number
+              lastUpdate: string
+              eodUpdate: string
+              updates: ProgressUpdate[]
+              submittedDate?: string
+              expectedCompletion?: string
+            }
+
+            interface Student {
+              id: string
+              name: string
+              rollNumber: string
+              projects: Project[]
+            }
+
+                        studentProjectMap.get(studentId).projects.push({
+                          id: project._id as string,
+                          name: (project.name || project.project) as string,
+                          status: progress === 100 ? "completed" : (project.status === "approved" ? "in_progress" : project.status),
+                          completion: progress as number,
+                          lastUpdate: latestUpdate?.date ? new Date(latestUpdate.date).toLocaleDateString() : "",
+                          eodUpdate: latestUpdate?.updateText || "No updates yet",
+                          updates: (updates as ProgressUpdate[]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), // Sort by date desc
+                          submittedDate: project.submittedDate,
+                          expectedCompletion: project.expectedCompletionDate
+                        } as Project)
+          } catch (error) {
+            console.error(`Error fetching updates for project ${project._id}:`, error)
+            // Add project without updates if fetch fails
+            studentProjectMap.get(studentId).projects.push({
+              id: project._id,
+              name: project.name || project.project,
+              status: project.progress === 100 ? "completed" : "in_progress",
+              completion: project.progress || 0,
+              lastUpdate: "",
+              eodUpdate: "No updates yet",
+              updates: [],
+              submittedDate: project.submittedDate,
+              expectedCompletion: project.expectedCompletionDate
+            })
+          }
+        }
+
+        // Convert map to array and filter out students with no projects
+        const studentsArray = Array.from(studentProjectMap.values()).filter(student => 
+          student.projects.length > 0
+        )
+
+        console.log("Final students array:", studentsArray)
+        setStudents(studentsArray)
       } catch (error) {
-        console.error("Error fetching students/projects:", error)
+        console.error("Error fetching projects:", error)
       }
       setLoading(false)
     }
@@ -101,8 +163,10 @@ export default function FacultyProgress() {
         return <Badge className="bg-green-100 text-green-800">Completed</Badge>
       case "in_progress":
         return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+      case "approved":
+        return <Badge className="bg-blue-100 text-blue-800">Approved</Badge>
       default:
-        return <Badge variant="secondary">Unknown</Badge>
+        return <Badge variant="secondary">{status}</Badge>
     }
   }
 
@@ -120,7 +184,7 @@ export default function FacultyProgress() {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Student Progress</h1>
-            <p className="mt-2 text-gray-600">Track the progress of all students under your guidance</p>
+            <p className="mt-2 text-gray-600">Track the progress of approved and completed projects under your guidance</p>
           </div>
 
           {/* Search input */}
@@ -137,7 +201,9 @@ export default function FacultyProgress() {
             {loading ? (
               <div className="text-gray-500">Loading...</div>
             ) : filteredStudents.length === 0 ? (
-              <div className="text-gray-500">No students found.</div>
+              <div className="text-gray-500">
+                {search ? "No students found matching your search." : "No students with approved or completed projects found."}
+              </div>
             ) : (
               filteredStudents.map((student) => (
                 <Card key={student.id}>
@@ -152,8 +218,8 @@ export default function FacultyProgress() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {student.projects.map((project: any, index: number) => (
-                        <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                      {student.projects.map((project: any) => (
+                        <div key={project.id} className="border rounded-lg p-4 bg-gray-50">
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="font-medium">{project.name}</h4>
                             {getStatusBadge(project.status)}
@@ -170,13 +236,20 @@ export default function FacultyProgress() {
 
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Calendar className="h-4 w-4" />
-                              Last updated: {project.lastUpdate}
+                              Last updated: {project.lastUpdate || "Not updated yet"}
                             </div>
+
+                            {project.submittedDate && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Calendar className="h-4 w-4" />
+                                Submitted: {new Date(project.submittedDate).toLocaleDateString()}
+                              </div>
+                            )}
 
                             <div>
                               <h5 className="text-sm font-medium mb-1 flex items-center gap-2">
                                 <Clock className="h-4 w-4" />
-                                Latest EOD Update
+                                Latest Update
                               </h5>
                               <p className="text-sm text-gray-600 bg-white p-3 rounded border">{project.eodUpdate}</p>
                             </div>
@@ -184,7 +257,7 @@ export default function FacultyProgress() {
                             {/* Show last 3 updates and "View all" button if more */}
                             <div className="space-y-2">
                               {project.updates?.slice(0, 3).map((update: any, idx: number) => (
-                                <div key={update._id || idx} className="bg-gray-50 p-2 rounded border">
+                                <div key={update._id || idx} className="bg-white p-2 rounded border">
                                   <p className="text-sm text-gray-800">{update.updateText}</p>
                                   <div className="flex justify-between text-xs text-gray-500">
                                     <span>{new Date(update.date).toLocaleDateString()}</span>
@@ -203,6 +276,10 @@ export default function FacultyProgress() {
                                   View all {project.updates.length} updates
                                 </Button>
                               )}
+
+                              {(!project.updates || project.updates.length === 0) && (
+                                <div className="text-sm text-gray-500 italic">No progress updates yet</div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -218,7 +295,7 @@ export default function FacultyProgress() {
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+                <CardTitle className="text-sm font-medium">Students with Projects</CardTitle>
                 <CheckCircle className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
@@ -235,7 +312,9 @@ export default function FacultyProgress() {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {students.reduce(
-                    (acc, student) => acc + student.projects.filter((p: any) => p.status === "in_progress").length,
+                    (acc, student) => acc + student.projects.filter((p: any) => 
+                      p.status === "in_progress" || p.status === "approved"
+                    ).length,
                     0,
                   )}
                 </div>
@@ -251,7 +330,9 @@ export default function FacultyProgress() {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {students.reduce(
-                    (acc, student) => acc + student.projects.filter((p: any) => p.status === "completed").length,
+                    (acc, student) => acc + student.projects.filter((p: any) => 
+                      p.status === "completed" || p.completion === 100
+                    ).length,
                     0,
                   )}
                 </div>
@@ -274,17 +355,21 @@ export default function FacultyProgress() {
 
             {/* Scrollable updates list */}
             <div className="space-y-4 max-h-[400px] overflow-y-auto">
-              {showAllUpdates.updates.map((update: any) => (
-                <div
-                  key={update._id}
-                  className="bg-gray-100 rounded-xl p-4"
-                >
-                  <div className="text-base font-medium text-gray-900">{update.updateText}</div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    {new Date(update.date).toLocaleDateString()}
+              {showAllUpdates.updates.length > 0 ? (
+                showAllUpdates.updates.map((update: any) => (
+                  <div
+                    key={update._id}
+                    className="bg-gray-100 rounded-xl p-4"
+                  >
+                    <div className="text-base font-medium text-gray-900">{update.updateText}</div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      {new Date(update.date).toLocaleDateString()} at {new Date(update.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="text-gray-500 text-center py-4">No progress updates available</div>
+              )}
             </div>
 
             <div className="mt-4 flex justify-end">

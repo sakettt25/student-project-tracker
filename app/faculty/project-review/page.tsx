@@ -41,6 +41,7 @@ export default function ProjectReview() {
   const [feedback, setFeedback] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
     fetchProjects()
@@ -122,18 +123,13 @@ export default function ProjectReview() {
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-semibold text-lg">{project.project}</div>
+            <div className="font-semibold text-lg">{project.project || "Untitled Project"}</div>
             <div className="text-sm text-gray-700 mt-1">
-              <span className="font-medium">Student:</span> {project.studentName}
+              <span className="font-medium">Student:</span> {project.studentName || "Unknown"}
             </div>
             {project.studentRoll && (
               <div className="text-sm text-gray-700">
                 <span className="font-medium">Roll:</span> {project.studentRoll}
-              </div>
-            )}
-            {project.studentSemester && (
-              <div className="text-sm text-gray-700">
-                <span className="font-medium">Semester:</span> {project.studentSemester}
               </div>
             )}
           </div>
@@ -200,6 +196,14 @@ export default function ProjectReview() {
     return date.toISOString().slice(0, 10)
   }
 
+  // Filter projects by name or roll
+  const filteredProjects = projects.filter(
+    (project) =>
+      (project.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (project.studentRoll || "").toLowerCase().includes(search.toLowerCase()) ||
+      (project.project || "").toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="min-h-screen bg-gray-50">
       <FacultyNavbar />
@@ -208,6 +212,16 @@ export default function ProjectReview() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Project Review</h1>
             <p className="mt-2 text-gray-600">Review and provide feedback on student projects</p>
+            {/* Filter/Search input */}
+            <div className="mt-4 max-w-sm">
+              <input
+                type="text"
+                className="w-full px-3 py-2 border rounded shadow-sm"
+                placeholder="Search by student name or roll number"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -216,14 +230,14 @@ export default function ProjectReview() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Pending Review
-                  <Badge variant="secondary">{filterProjects('pending').length}</Badge>
+                  <Badge variant="secondary">{filteredProjects.filter(p => p.status === 'pending').length}</Badge>
                 </CardTitle>
                 <CardDescription>New project submissions</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {filterProjects('pending').map((project) => (
+                    {filteredProjects.filter(p => p.status === 'pending').map((project) => (
                       <ProjectCard key={project._id} project={project} />
                     ))}
                   </div>
@@ -236,14 +250,14 @@ export default function ProjectReview() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Approved Projects
-                  <Badge variant="default">{filterProjects('approved').length}</Badge>
+                  <Badge variant="default">{filteredProjects.filter(p => p.status === 'approved').length}</Badge>
                 </CardTitle>
                 <CardDescription>Successfully approved projects</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {filterProjects('approved').map((project) => (
+                    {filteredProjects.filter(p => p.status === 'approved').map((project) => (
                       <ProjectCard key={project._id} project={project} />
                     ))}
                   </div>
@@ -256,14 +270,14 @@ export default function ProjectReview() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Rejected Projects
-                  <Badge variant="destructive">{filterProjects('rejected').length}</Badge>
+                  <Badge variant="destructive">{filteredProjects.filter(p => p.status === 'rejected').length}</Badge>
                 </CardTitle>
                 <CardDescription>Projects needing changes</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
-                    {filterProjects('rejected').map((project) => (
+                    {filteredProjects.filter(p => p.status === 'rejected').map((project) => (
                       <ProjectCard key={project._id} project={project} />
                     ))}
                   </div>

@@ -33,6 +33,8 @@ export default function StudentProjects() {
   })
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Fetch projects for the logged-in student
   useEffect(() => {
@@ -59,14 +61,21 @@ export default function StudentProjects() {
 
   // Group projects by status
   const groupedProjects = {
-    inReview: projects.filter((p) => p.status === "in_review"),
+    rejected: projects.filter((p) => p.status === "rejected"),
     pending: projects.filter((p) => p.status === "pending"),
     approved: projects.filter((p) => p.status === "approved"),
   }
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token) return
+    if (!token) {
+      setError("Authentication required. Please log in again.")
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+
     try {
       const response = await fetch("/api/projects", {
         method: "POST",
@@ -82,20 +91,27 @@ export default function StudentProjects() {
           expectedCompletionDate: projectForm.expectedCompletion,
         }),
       })
-      if (response.ok) {
-        const data = await response.json()
-        setProjects([data.project, ...projects])
-        setProjectForm({
-          name: "",
-          description: "",
-          techStack: "",
-          realLifeApplication: "",
-          expectedCompletion: "",
-        })
-        setIsDialogOpen(false)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Failed to submit project" }))
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`)
       }
+
+      const data = await response.json()
+      setProjects([data.project, ...projects])
+      setProjectForm({
+        name: "",
+        description: "",
+        techStack: "",
+        realLifeApplication: "",
+        expectedCompletion: "",
+      })
+      setIsDialogOpen(false)
     } catch (error) {
       console.error("Project submission failed:", error)
+      setError(error instanceof Error ? error.message : "Failed to submit project")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -185,6 +201,11 @@ export default function StudentProjects() {
                       <DialogDescription>Fill in the details for your new project submission</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleFormSubmit} className="space-y-4">
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                          {error}
+                        </div>
+                      )}
                       <div>
                         <Label htmlFor="projectName">Project Name</Label>
                         <Input
@@ -193,6 +214,7 @@ export default function StudentProjects() {
                           onChange={(e) => handleInputChange("name", e.target.value)}
                           placeholder="Enter project name"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -204,6 +226,7 @@ export default function StudentProjects() {
                           placeholder="Describe your project"
                           className="min-h-24"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -214,6 +237,7 @@ export default function StudentProjects() {
                           onChange={(e) => handleInputChange("techStack", e.target.value)}
                           placeholder="e.g., React, Node.js, MongoDB"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -225,6 +249,7 @@ export default function StudentProjects() {
                           placeholder="How can this project be used in real life?"
                           className="min-h-20"
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div>
@@ -235,13 +260,22 @@ export default function StudentProjects() {
                           value={projectForm.expectedCompletion}
                           onChange={(e) => handleInputChange("expectedCompletion", e.target.value)}
                           required
+                          disabled={submitting}
                         />
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          Submit Project
+                        <Button type="submit" className="flex-1" disabled={submitting}>
+                          {submitting ? "Submitting..." : "Submit Project"}
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsDialogOpen(false)
+                            setError(null)
+                          }}
+                          disabled={submitting}
+                        >
                           Cancel
                         </Button>
                       </div>
@@ -251,24 +285,24 @@ export default function StudentProjects() {
               </CardContent>
             </Card>
 
-            {/* Projects in Review */}
+            {/* Rejected Projects */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  In Review
-                  <Badge variant="secondary">{groupedProjects.inReview.length}</Badge>
+                  Rejected
+                  <Badge variant="destructive">{groupedProjects.rejected.length}</Badge>
                 </CardTitle>
-                <CardDescription>Projects being reviewed by faculty</CardDescription>
+                <CardDescription>Projects that need revision</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
                   <div className="space-y-3">
                     {loading ? (
                       <div className="text-gray-400">Loading...</div>
-                    ) : groupedProjects.inReview.length === 0 ? (
-                      <div className="text-gray-400">No projects in review</div>
+                    ) : groupedProjects.rejected.length === 0 ? (
+                      <div className="text-gray-400">No rejected projects</div>
                     ) : (
-                      groupedProjects.inReview.map((project) => (
+                      groupedProjects.rejected.map((project) => (
                         <ProjectCard key={project._id} project={project} onClick={() => setSelectedProject(project)} />
                       ))
                     )}
@@ -308,7 +342,7 @@ export default function StudentProjects() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Approved
-                  <Badge variant="secondary">{groupedProjects.approved.length}</Badge>
+                  <Badge className="bg-green-100 text-green-800">{groupedProjects.approved.length}</Badge>
                 </CardTitle>
                 <CardDescription>Successfully approved projects</CardDescription>
               </CardHeader>
