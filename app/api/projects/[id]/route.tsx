@@ -42,12 +42,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     // Update fields based on user role
     if (user.role === "faculty") {
+      if (body.evaluation) {
+        // Merge all evaluation-related fields into one object
+        project.evaluation = {
+          ...body.evaluation,
+          comments: body.comments ?? body.evaluation.comments,
+          recommendations: body.recommendations ?? body.evaluation.recommendations,
+          totalScore: body.score ?? body.evaluation.totalScore,
+          grade: body.grade ?? body.evaluation.grade,
+          evaluatedAt: new Date().toISOString(),
+        }
+        // Optionally, also update top-level fields for backward compatibility
+        project.score = body.score ?? project.score
+        project.grade = body.grade ?? project.grade
+        project.comments = body.comments ?? project.comments
+        project.recommendations = body.recommendations ?? project.recommendations
+      }
       if (body.status) project.status = body.status
-      if (body.evaluation) project.evaluation = body.evaluation
-      if (body.score !== undefined) project.score = body.score
-      if (body.grade) project.grade = body.grade
-      if (body.comments) project.comments = body.comments
-      if (body.recommendations) project.recommendations = body.recommendations
     }
 
     if (user.role === "student" && body.progress !== undefined) {
@@ -58,24 +69,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     await project.populate("studentId", "name rollNumber email")
     await project.populate("facultyId", "name email")
 
-    return NextResponse.json({ project })
+    // Return the same structure as GET
+    return NextResponse.json({
+      ...project.toObject(),
+      evaluation: project.evaluation || null,
+    })
   } catch (error) {
     console.error("Update project error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const projectId = params.id
   await dbConnect()
-  const { id } = params
+  const project = await Project.findById(projectId)
+  if (!project) return new Response("Not found", { status: 404 })
 
-  try {
-    const project = await Project.findById(id)
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 })
-    }
-    return NextResponse.json(project)
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch project" }, { status: 500 })
-  }
+  // Ensure evaluation is included in the response
+  return Response.json({
+    ...project.toObject(),
+    evaluation: project.evaluation || null,
+  })
 }

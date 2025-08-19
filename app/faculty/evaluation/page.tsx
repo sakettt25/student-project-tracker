@@ -137,7 +137,8 @@ export default function FacultyEvaluation() {
         }
         // Prefer to select a project that is ready for evaluation, else first project
         const pending = allProjects.find((s) => s.status === "ready_for_evaluation")
-        setSelectedStudent(pending || allProjects[0] || null)
+        const initialStudent = pending || allProjects[0] || null
+        setSelectedStudent(initialStudent)
       } catch (e: any) {
         setStudentsForEvaluation([])
         setError("Error fetching students or projects. Please try again later.")
@@ -147,73 +148,55 @@ export default function FacultyEvaluation() {
     fetchData()
   }, [token, user?.id])
 
-  // Reset form when student changes
-  useEffect(() => {
-    setCriteriaScores({})
-    setOverallGrade("")
-    setComments("")
-    setRecommendations("")
-    setEditMode(false)
-  }, [selectedStudent])
-
-  // Filter students by name, roll, or project
-  // (duplicate declaration removed)
-
-  // Calculate total score (out of 100)
-  // (duplicate declaration removed)
-
-  // Grade calculation helper
-  // function getGrade(score: number) {
-  //   if (score >= 90) return "A+"
-  //   if (score >= 80) return "A"
-  //   if (score >= 70) return "B+"
-  //   if (score >= 60) return "B"
-  //   if (score >= 50) return "C+"
-  //   if (score >= 40) return "C"
-  //   return "F"
-  // }
-
-  // Handle evaluation submit
-  // (duplicate removed)
-
-  // EFFECT: when selectedStudent changes fetch latest evaluation to prefill
+  // Always fetch latest evaluation and set form fields when selectedStudent changes
   useEffect(() => {
     const loadEvaluation = async () => {
-      if (!selectedStudent?.projectId || !token) return
+      if (!selectedStudent?.projectId || !token) {
+        setCriteriaScores({})
+        setOverallGrade("")
+        setComments("")
+        setRecommendations("")
+        setEditMode(false)
+        return
+      }
       try {
         const res = await fetch(`/api/projects/${selectedStudent.projectId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        if (!res.ok) return
+        if (!res.ok) {
+          setCriteriaScores({})
+          setOverallGrade("")
+          setComments("")
+          setRecommendations("")
+          setEditMode(false)
+          return
+        }
         const detail = await res.json()
         if (detail.evaluation) {
-          const cs: { [k: string]: number | "" } = {}
-          Object.entries(detail.evaluation.criteriaScores || {}).forEach(([k, v]) => {
-            cs[k] = Number(v)
-          })
-          setCriteriaScores(cs)
+          // Always set form fields from backend response
+          setCriteriaScores(
+            Object.fromEntries(
+              Object.entries(detail.evaluation.criteriaScores || {}).map(([k, v]) => [k, Number(v)])
+            )
+          )
           setOverallGrade(detail.evaluation.grade || "")
           setComments(detail.evaluation.comments || "")
           setRecommendations(detail.evaluation.recommendations || "")
           setEditMode(false)
-          // Add this: update selectedStudent score/grade if missing
-          setSelectedStudent(prev =>
-            prev
-              ? {
-                  ...prev,
-                  score:
-                    prev.score ??
-                    detail.score ??
-                    detail.evaluation.totalScore,
-                  grade:
-                    prev.grade ??
-                    detail.grade ??
-                    detail.evaluation.grade,
-                }
-              : prev
-          )
+        } else {
+          setCriteriaScores({})
+          setOverallGrade("")
+          setComments("")
+          setRecommendations("")
+          setEditMode(false)
         }
-      } catch {}
+      } catch {
+        setCriteriaScores({})
+        setOverallGrade("")
+        setComments("")
+        setRecommendations("")
+        setEditMode(false)
+      }
     }
     loadEvaluation()
   }, [selectedStudent?.projectId, token])
@@ -314,9 +297,28 @@ export default function FacultyEvaluation() {
               status: "evaluated",
               grade: projectDetail.grade || overallGrade || getGrade(totalScore),
               score: projectDetail.score || Math.round(totalScore),
+              evaluation: {
+                criteriaScores: Object.fromEntries(
+                  Object.entries(criteriaScores).map(([k, v]) => [k, Number(v)])
+                ),
+                comments,
+                recommendations,
+                totalScore: Math.round(totalScore),
+                grade: projectDetail.grade || overallGrade || getGrade(totalScore),
+                evaluatedAt: new Date().toISOString(),
+              },
             }
           : null
       )
+      // NEW: Immediately update form fields with latest evaluation
+      setCriteriaScores(
+        Object.fromEntries(
+          Object.entries(criteriaScores).map(([k, v]) => [k, Number(v)])
+        )
+      )
+      setOverallGrade(projectDetail.grade || overallGrade || getGrade(totalScore))
+      setComments(comments)
+      setRecommendations(recommendations)
       setEditMode(false)
     } catch (error) {
       toast.error("Failed to submit evaluation")
