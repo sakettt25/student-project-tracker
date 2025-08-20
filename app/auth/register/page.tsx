@@ -24,7 +24,8 @@ import {
   Building,
   IdCard,
   BookOpen,
-  Users
+  Users,
+  RefreshCw
 } from "lucide-react"
 
 export default function Register() {
@@ -43,28 +44,66 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [faculties, setFaculties] = useState([])
+  // Define a Faculty type for better type safety
+  type Faculty = {
+    _id: string
+    name: string
+    university?: string
+    // add other fields if needed
+  }
+
+  const [faculties, setFaculties] = useState<Faculty[]>([])
+  const [facultyLoading, setFacultyLoading] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState(0)
 
   const { register } = useAuth()
   const router = useRouter()
 
-  useEffect(() => {
-    const fetchFaculties = async () => {
-      if (formData.role === "student") {
-        try {
-          const response = await fetch("/api/faculty")
-          if (response.ok) {
-            const data = await response.json()
-            setFaculties(data)
-          }
-        } catch (error) {
-          console.error("Failed to fetch faculty list:", error)
+  // Fetch faculties function
+  const fetchFaculties = async () => {
+    setFacultyLoading(true)
+    try {
+      console.log("Fetching faculties...")
+      const response = await fetch("/api/faculty")
+      console.log("Faculty API response status:", response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log("Faculty data received:", data)
+        
+        // Handle different possible response structures
+        if (Array.isArray(data)) {
+          setFaculties(data)
+        } else if (data.faculties && Array.isArray(data.faculties)) {
+          setFaculties(data.faculties)
+        } else if (data.users && Array.isArray(data.users)) {
+          // In case the API returns all users, filter for faculty
+          const facultyUsers = data.users.filter((user: any) => user.role === 'faculty')
+          setFaculties(facultyUsers)
+        } else {
+          console.error("Unexpected faculty data structure:", data)
+          setFaculties([])
         }
+      } else {
+        console.error("Failed to fetch faculties, status:", response.status)
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+        setFaculties([])
       }
+    } catch (error) {
+      console.error("Error fetching faculty list:", error)
+      setFaculties([])
+    } finally {
+      setFacultyLoading(false)
     }
+  }
 
-    fetchFaculties()
+  useEffect(() => {
+    if (formData.role === "student") {
+      fetchFaculties()
+    } else {
+      setFaculties([])
+    }
   }, [formData.role])
 
   useEffect(() => {
@@ -106,6 +145,8 @@ export default function Register() {
       semester: formData.role === "student" && formData.semester.trim() !== "" ? Number.parseInt(formData.semester) : undefined,
       facultyId: formData.role === "student" && formData.facultyId.trim() !== "" ? formData.facultyId : undefined,
     }
+
+    console.log("Submitting registration data:", userData)
 
     const success = await register(formData.email, formData.password, userData)
 
@@ -309,25 +350,46 @@ export default function Register() {
                     <Label htmlFor="faculty" className="text-sm font-semibold text-gray-800 flex items-center gap-2">
                       <Users className="h-4 w-4 text-blue-600" />
                       Select Faculty
+                      {facultyLoading && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
                     </Label>
                     <Select
                       value={formData.facultyId}
                       onValueChange={(value) => handleInputChange("facultyId", value)}
+                      disabled={facultyLoading}
                     >
                       <SelectTrigger className="h-12 bg-white/90 border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                        <SelectValue placeholder="Choose a faculty mentor" />
+                        <SelectValue placeholder={
+                          facultyLoading ? "Loading faculty..." : 
+                          faculties.length === 0 ? "No faculty available" :
+                          "Choose a faculty mentor"
+                        } />
                       </SelectTrigger>
                       <SelectContent>
-                        {faculties.map((faculty: any) => (
-                          <SelectItem key={faculty._id} value={faculty._id}>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium">{faculty.name}</span>
-                              <span className="text-xs text-gray-500">{faculty.university}</span>
+                        {faculties.length === 0 && !facultyLoading ? (
+                          <SelectItem value="no-faculty" disabled>
+                            <div className="flex items-center gap-2 text-gray-500">
+                              <AlertCircle className="h-4 w-4" />
+                              No faculty members found
                             </div>
                           </SelectItem>
-                        ))}
+                        ) : (
+                          faculties.map((faculty: any) => (
+                            <SelectItem key={faculty._id} value={faculty._id}>
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">{faculty.name}</span>
+                                <span className="text-xs text-gray-500">{faculty.university || 'University not specified'}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
+                    
+                    {/* Debug info */}
+                    <div className="text-xs text-gray-500">
+                      {faculties.length > 0 ? `Found ${faculties.length} faculty member(s)` : 
+                       !facultyLoading ? "No faculty members available" : "Loading..."}
+                    </div>
                   </div>
                 </div>
               )}
