@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Star, FileText, Award } from "lucide-react"
+import { Star, FileText, Award, Search, User, Calendar, BarChart3, TrendingUp, CheckCircle, Clock, Edit3 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
@@ -326,77 +326,122 @@ export default function FacultyEvaluation() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <FacultyNavbar />
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-100 to-pink-100 rounded-full opacity-30 blur-3xl"></div>
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Project Evaluation</h1>
-            <p className="mt-2 text-gray-600">Evaluate and grade student projects</p>
+          {/* Header Section */}
+          <div className="mb-10">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                <Award className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  Project Evaluation
+                </h1>
+                <p className="mt-2 text-gray-600 text-lg">Evaluate and grade completed student projects</p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Students List */}
             <div className="lg:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
+              <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg">
+                      <FileText className="h-5 w-5 text-white" />
+                    </div>
                     Students for Evaluation
                   </CardTitle>
-                  <CardDescription>Click on a student to start evaluation</CardDescription>
+                  <CardDescription className="text-gray-600">Click on a student to start evaluation</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Input
-                    placeholder="Search by name, roll, or project"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="mb-3"
-                  />
+                <CardContent className="p-6">
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name, roll, or project"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-10 bg-white/80 backdrop-blur-sm border-0 shadow-sm focus:shadow-md transition-all duration-300"
+                    />
+                  </div>
                   <ScrollArea className="h-96">
                     <div className="space-y-3">
                       {loading ? (
-                        <div className="text-gray-500">Loading...</div>
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <div className="text-gray-500">Loading...</div>
+                        </div>
                       ) : error ? (
-                        <div className="text-red-500">{error}</div>
+                        <div className="text-center py-8">
+                          <FileText className="h-12 w-12 text-red-300 mx-auto mb-3" />
+                          <div className="text-red-500 text-sm">{error}</div>
+                        </div>
                       ) : filteredStudents.length === 0 ? (
-                        <div className="text-gray-500">No students found.</div>
+                        <div className="text-center py-8">
+                          <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          <div className="text-gray-500">No students found.</div>
+                        </div>
                       ) : (
                         filteredStudents.map((student) => (
                           <Card
                             key={student.projectId}
-                            className={`cursor-pointer hover:shadow-md transition-shadow ${
+                            className={`cursor-pointer hover:shadow-lg transition-all duration-300 border-0 bg-white/90 backdrop-blur-sm ${
                               selectedStudent?.projectId === student.projectId
-                                ? "ring-2 ring-blue-500"
-                                : ""
+                                ? "ring-2 ring-blue-500 shadow-lg scale-[1.02]"
+                                : "hover:scale-[1.01]"
                             }`}
                             onClick={() => setSelectedStudent(student)}
                           >
                             <CardContent className="p-4">
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <div>
-                                    <h4 className="font-medium">{student.name}</h4>
-                                    <div className="text-xs text-gray-500">Roll: {student.rollNumber}</div>
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-blue-600" />
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900">{student.name}</h4>
+                                      <div className="text-xs text-gray-500">Roll: {student.rollNumber}</div>
+                                    </div>
                                   </div>
                                   {student.status === "evaluated" ? (
-                                    <Badge className="bg-green-100 text-green-800">
+                                    <Badge className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 border-emerald-200 shadow-sm">
                                       <Award className="h-3 w-3 mr-1" />
                                       {student.grade}
                                     </Badge>
                                   ) : student.status === "ready_for_evaluation" ? (
-                                    <Badge className="bg-yellow-100 text-yellow-800">
+                                    <Badge className="bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border-amber-200 shadow-sm">
+                                      <Clock className="h-3 w-3 mr-1" />
                                       Pending
                                     </Badge>
                                   ) : (
-                                    <Badge variant="outline">{student.status}</Badge>
+                                    <Badge variant="outline" className="shadow-sm">{student.status}</Badge>
                                   )}
                                 </div>
-                                <p className="text-sm text-gray-600">{student.project}</p>
+                                <div className="bg-gray-50 p-2 rounded-lg">
+                                  <p className="text-sm text-gray-700 font-medium">{student.project}</p>
+                                </div>
                                 {student.status === "evaluated" && (
-                                  <p className="text-xs text-green-600">
-                                    Score: {(student.score ?? student.evaluation?.totalScore)}/100
-                                  </p>
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-emerald-600 font-semibold">
+                                      Score: {(student.score ?? student.evaluation?.totalScore)}/100
+                                    </span>
+                                    {student.submissionDate && (
+                                      <span className="text-gray-500">
+                                        <Calendar className="h-3 w-3 inline mr-1" />
+                                        {new Date(student.submissionDate).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </CardContent>
@@ -411,88 +456,131 @@ export default function FacultyEvaluation() {
 
             {/* Evaluation Form */}
             <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5" />
+              <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg">
+                      <Star className="h-5 w-5 text-white" />
+                    </div>
                     Evaluation Form
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-gray-600">
                     {selectedStudent
                       ? `Evaluate ${selectedStudent.name}'s "${selectedStudent.project}" project`
                       : "Select a student to evaluate"}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-6 space-y-6">
                   {selectedStudent ? (
                     <>
                       {/* Project Details */}
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h4 className="font-medium mb-2">Project Details</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Student:</span> {selectedStudent.name}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-blue-800">
+                          <FileText className="h-4 w-4" />
+                          Project Details
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="bg-white p-3 rounded-lg border border-blue-100">
+                            <span className="font-medium text-gray-700">Student:</span>
+                            <p className="text-gray-900 font-semibold">{selectedStudent.name}</p>
                           </div>
-                          <div>
-                            <span className="font-medium">Roll Number:</span> {selectedStudent.rollNumber}
+                          <div className="bg-white p-3 rounded-lg border border-blue-100">
+                            <span className="font-medium text-gray-700">Roll Number:</span>
+                            <p className="text-gray-900 font-semibold">{selectedStudent.rollNumber}</p>
                           </div>
-                          <div>
-                            <span className="font-medium">Project:</span> {selectedStudent.project}
+                          <div className="bg-white p-3 rounded-lg border border-blue-100 md:col-span-2">
+                            <span className="font-medium text-gray-700">Project:</span>
+                            <p className="text-gray-900 font-semibold">{selectedStudent.project}</p>
                           </div>
+                          {selectedStudent.submissionDate && (
+                            <div className="bg-white p-3 rounded-lg border border-blue-100 md:col-span-2">
+                              <span className="font-medium text-gray-700">Submission Date:</span>
+                              <p className="text-gray-900 font-semibold">
+                                {new Date(selectedStudent.submissionDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* Evaluation Criteria */}
-                      <div>
-                        <h4 className="font-medium mb-4">Evaluation Criteria</h4>
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100">
+                        <h4 className="font-semibold mb-4 flex items-center gap-2 text-purple-800">
+                          <BarChart3 className="h-4 w-4" />
+                          Evaluation Criteria
+                        </h4>
                         <div className="space-y-4">
                           {evaluationCriteria.map((criteria, index) => (
-                            <div key={index} className="flex items-center gap-4">
-                              <div className="flex-1">
-                                <Label className="text-sm font-medium">
-                                  {criteria.name} (out of {criteria.weight})
+                            <div key={index} className="bg-white p-4 rounded-lg border border-purple-100">
+                              <div className="flex items-center justify-between mb-3">
+                                <Label className="text-sm font-semibold text-gray-800">
+                                  {criteria.name}
                                 </Label>
+                                <Badge variant="outline" className="text-xs">
+                                  Max: {criteria.weight} points
+                                </Badge>
                               </div>
-                              <div className="w-32">
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  max={criteria.weight}
-                                  value={
-                                    criteriaScores[criteria.name] === undefined
-                                      ? ""
-                                      : criteriaScores[criteria.name]
-                                  }
-                                  onChange={e => {
-                                    let val = e.target.value
-                                    // Allow empty string for erasing
-                                    if (val === "") {
-                                      setCriteriaScores(prev => ({
-                                        ...prev,
-                                        [criteria.name]: "",
-                                      }))
-                                      return
-                                    }
-                                    let num = Number(val)
-                                    if (num > criteria.weight) num = criteria.weight
-                                    if (num < 0) num = 0
+                              <Input
+                                type="number"
+                                min={0}
+                                max={criteria.weight}
+                                value={
+                                  criteriaScores[criteria.name] === undefined
+                                    ? ""
+                                    : criteriaScores[criteria.name]
+                                }
+                                onChange={e => {
+                                  let val = e.target.value
+                                  // Allow empty string for erasing
+                                  if (val === "") {
                                     setCriteriaScores(prev => ({
                                       ...prev,
-                                      [criteria.name]: num,
+                                      [criteria.name]: "",
                                     }))
-                                  }}
-                                  disabled={selectedStudent?.status === "evaluated" && !editMode}
-                                  placeholder={`0 - ${criteria.weight}`}
-                                />
-                              </div>
+                                    return
+                                  }
+                                  let num = Number(val)
+                                  if (num > criteria.weight) num = criteria.weight
+                                  if (num < 0) num = 0
+                                  setCriteriaScores(prev => ({
+                                    ...prev,
+                                    [criteria.name]: num,
+                                  }))
+                                }}
+                                disabled={selectedStudent?.status === "evaluated" && !editMode}
+                                placeholder={`Enter score (0 - ${criteria.weight})`}
+                                className="bg-white border-purple-200 focus:border-purple-400 focus:ring-purple-400"
+                              />
                             </div>
                           ))}
                         </div>
                       </div>
 
+                      {/* Score Summary */}
+                      <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-4 rounded-xl border border-emerald-100">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-emerald-800">
+                          <TrendingUp className="h-4 w-4" />
+                          Score Summary
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-white p-3 rounded-lg border border-emerald-100 text-center">
+                            <div className="text-2xl font-bold text-emerald-600">{Math.round(totalScore)}</div>
+                            <div className="text-xs text-gray-600">Total Score</div>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border border-emerald-100 text-center">
+                            <div className="text-2xl font-bold text-emerald-600">{getGrade(totalScore)}</div>
+                            <div className="text-xs text-gray-600">Suggested Grade</div>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border border-emerald-100 text-center">
+                            <div className="text-2xl font-bold text-emerald-600">{Math.round((totalScore / 100) * 100)}%</div>
+                            <div className="text-xs text-gray-600">Percentage</div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Overall Grade */}
                       <div>
-                        <Label htmlFor="overall-grade" className="text-sm font-medium">
+                        <Label htmlFor="overall-grade" className="text-sm font-semibold text-gray-800 mb-2 block">
                           Overall Grade
                         </Label>
                         <Select
@@ -500,7 +588,7 @@ export default function FacultyEvaluation() {
                           onValueChange={setOverallGrade}
                           disabled={selectedStudent.status === "evaluated" && !editMode}
                         >
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="bg-white border-gray-300 focus:border-blue-400 focus:ring-blue-400">
                             <SelectValue placeholder={overallGrade || getGrade(totalScore)} />
                           </SelectTrigger>
                           <SelectContent>
@@ -513,20 +601,17 @@ export default function FacultyEvaluation() {
                             <SelectItem value="F">F (Below 40)</SelectItem>
                           </SelectContent>
                         </Select>
-                        <div className="mt-2 text-sm text-gray-600">
-                          Calculated Score: <span className="font-bold">{Math.round(totalScore)}/100</span> &nbsp;|&nbsp; Suggested Grade: <span className="font-bold">{getGrade(totalScore)}</span>
-                        </div>
                       </div>
 
                       {/* Comments */}
                       <div>
-                        <Label htmlFor="comments" className="text-sm font-medium">
+                        <Label htmlFor="comments" className="text-sm font-semibold text-gray-800 mb-2 block">
                           Evaluation Comments
                         </Label>
                         <Textarea
                           id="comments"
                           placeholder="Provide detailed feedback on the project..."
-                          className="mt-1 min-h-24"
+                          className="min-h-24 bg-white border-gray-300 focus:border-blue-400 focus:ring-blue-400"
                           value={comments}
                           onChange={(e) => setComments(e.target.value)}
                           disabled={selectedStudent.status === "evaluated" && !editMode}
@@ -535,13 +620,13 @@ export default function FacultyEvaluation() {
 
                       {/* Recommendations */}
                       <div>
-                        <Label htmlFor="recommendations" className="text-sm font-medium">
+                        <Label htmlFor="recommendations" className="text-sm font-semibold text-gray-800 mb-2 block">
                           Recommendations for Improvement
                         </Label>
                         <Textarea
                           id="recommendations"
                           placeholder="Suggest areas for improvement..."
-                          className="mt-1 min-h-20"
+                          className="min-h-20 bg-white border-gray-300 focus:border-blue-400 focus:ring-blue-400"
                           value={recommendations}
                           onChange={(e) => setRecommendations(e.target.value)}
                           disabled={selectedStudent.status === "evaluated" && !editMode}
@@ -550,28 +635,55 @@ export default function FacultyEvaluation() {
 
                       {/* Action Buttons */}
                       {selectedStudent.status !== "evaluated" || editMode ? (
-                        <div className="flex gap-3">
-                          <Button className="flex-1" onClick={handleSubmit}>
+                        <div className="flex gap-3 pt-4 border-t">
+                          <Button 
+                            className="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-lg" 
+                            onClick={handleSubmit}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
                             {editMode ? "Update Evaluation" : "Submit Evaluation"}
                           </Button>
+                          {editMode && (
+                            <Button variant="outline" onClick={() => setEditMode(false)} className="shadow-sm">
+                              Cancel
+                            </Button>
+                          )}
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-2">
-                          <div className="text-green-700 font-semibold">
-                            Evaluation submitted.<br />
-                            <span>
-                              Score: <span className="font-bold">{selectedStudent.score}</span> / 100 &nbsp;|&nbsp;
-                              Grade: <span className="font-bold">{selectedStudent.grade}</span>
-                            </span>
+                        <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-4 rounded-xl border border-emerald-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-emerald-800 font-semibold flex items-center gap-2 mb-2">
+                                <CheckCircle className="h-5 w-5" />
+                                Evaluation Completed
+                              </div>
+                              <div className="text-sm text-emerald-700">
+                                Score: <span className="font-bold">{selectedStudent.score}</span> / 100 &nbsp;|&nbsp;
+                                Grade: <span className="font-bold">{selectedStudent.grade}</span>
+                              </div>
+                              {selectedStudent.evaluation?.evaluatedAt && (
+                                <div className="text-xs text-emerald-600 mt-1">
+                                  Evaluated on {new Date(selectedStudent.evaluation.evaluatedAt).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setEditMode(true)}
+                              className="bg-white hover:bg-gray-50 shadow-sm"
+                            >
+                              <Edit3 className="h-4 w-4 mr-2" />
+                              Modify
+                            </Button>
                           </div>
-                          <Button variant="outline" onClick={() => setEditMode(true)}>
-                            Modify Evaluation
-                          </Button>
                         </div>
                       )}
                     </>
                   ) : (
-                    <div className="text-gray-500">Select a student to start evaluation.</div>
+                    <div className="text-center py-16">
+                      <Star className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                      <div className="text-gray-500 text-lg">Select a student to start evaluation</div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -579,27 +691,31 @@ export default function FacultyEvaluation() {
           </div>
 
           {/* Evaluation Statistics */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Evaluations</CardTitle>
-                <FileText className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-sm font-medium text-gray-700">Total Evaluations</CardTitle>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-3xl font-bold text-blue-600 mb-1">
                   {studentsForEvaluation.filter((s) => s.status === "evaluated").length}
                 </div>
-                <p className="text-xs text-muted-foreground">This semester</p>
+                <p className="text-xs text-blue-700 font-medium">This semester</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-amber-50 to-orange-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Grade</CardTitle>
-                <Star className="h-4 w-4 text-yellow-600" />
+                <CardTitle className="text-sm font-medium text-gray-700">Average Grade</CardTitle>
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <Star className="h-4 w-4 text-amber-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-3xl font-bold text-amber-600 mb-1">
                   {(() => {
                     const evaluated = studentsForEvaluation.filter((s) => s.status === "evaluated")
                     if (!evaluated.length) return "-"
@@ -607,33 +723,37 @@ export default function FacultyEvaluation() {
                     return getGrade(avg)
                   })()}
                 </div>
-                <p className="text-xs text-muted-foreground">Class average</p>
+                <p className="text-xs text-amber-700 font-medium">Class average</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-                <Award className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm font-medium text-gray-700">Pending Reviews</CardTitle>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <Clock className="h-4 w-4 text-red-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-3xl font-bold text-red-600 mb-1">
                   {studentsForEvaluation.filter((s) => s.status === "ready_for_evaluation").length}
                 </div>
-                <p className="text-xs text-muted-foreground">Awaiting evaluation</p>
+                <p className="text-xs text-red-700 font-medium">Awaiting evaluation</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">A Grade Projects</CardTitle>
-                <Award className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-sm font-medium text-gray-700">A Grade Projects</CardTitle>
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <Award className="h-4 w-4 text-emerald-600" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-3xl font-bold text-emerald-600 mb-1">
                   {studentsForEvaluation.filter((s) => ["A+", "A"].includes(s.grade || "")).length}
                 </div>
-                <p className="text-xs text-muted-foreground">Excellent work</p>
+                <p className="text-xs text-emerald-700 font-medium">Excellent work</p>
               </CardContent>
             </Card>
           </div>
