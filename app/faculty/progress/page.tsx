@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, CheckCircle, Clock } from "lucide-react"
+import { Calendar, CheckCircle, Clock, TrendingUp, User, Search, FileText, BarChart3, Target } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import {
   Dialog,
@@ -21,10 +21,36 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+interface ProgressUpdate {
+  _id?: string
+  updateText: string
+  date: string
+}
+
+interface Project {
+  id: string
+  name: string
+  status: string
+  completion: number
+  lastUpdate: string
+  eodUpdate: string
+  updates: ProgressUpdate[]
+  submittedDate?: string
+  expectedCompletion?: string
+}
+
+interface Student {
+  id: string
+  name: string
+  rollNumber: string
+  projects: Project[]
+}
 
 export default function FacultyProgress() {
   const { user, token } = useAuth()
-  const [students, setStudents] = useState<any[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [showAllUpdates, setShowAllUpdates] = useState<{ projectName: string, updates: any[] } | null>(null)
   const [search, setSearch] = useState("")
@@ -88,42 +114,17 @@ export default function FacultyProgress() {
             const latestUpdate = updates[0] || null
             const progress = project.progress || 0
 
-            interface ProgressUpdate {
-              _id?: string
-              updateText: string
-              date: string
-            }
-
-            interface Project {
-              id: string
-              name: string
-              status: string
-              completion: number
-              lastUpdate: string
-              eodUpdate: string
-              updates: ProgressUpdate[]
-              submittedDate?: string
-              expectedCompletion?: string
-            }
-
-            interface Student {
-              id: string
-              name: string
-              rollNumber: string
-              projects: Project[]
-            }
-
-                        studentProjectMap.get(studentId).projects.push({
-                          id: project._id as string,
-                          name: (project.name || project.project) as string,
-                          status: progress === 100 ? "completed" : (project.status === "approved" ? "in_progress" : project.status),
-                          completion: progress as number,
-                          lastUpdate: latestUpdate?.date ? new Date(latestUpdate.date).toLocaleDateString() : "",
-                          eodUpdate: latestUpdate?.updateText || "No updates yet",
-                          updates: (updates as ProgressUpdate[]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), // Sort by date desc
-                          submittedDate: project.submittedDate,
-                          expectedCompletion: project.expectedCompletionDate
-                        } as Project)
+            studentProjectMap.get(studentId).projects.push({
+              id: project._id as string,
+              name: (project.name || project.project) as string,
+              status: progress === 100 ? "completed" : (project.status === "approved" ? "in_progress" : project.status),
+              completion: progress as number,
+              lastUpdate: latestUpdate?.date ? new Date(latestUpdate.date).toLocaleDateString() : "",
+              eodUpdate: latestUpdate?.updateText || "No updates yet",
+              updates: (updates as ProgressUpdate[]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), // Sort by date desc
+              submittedDate: project.submittedDate,
+              expectedCompletion: project.expectedCompletionDate
+            } as Project)
           } catch (error) {
             console.error(`Error fetching updates for project ${project._id}:`, error)
             // Add project without updates if fetch fails
@@ -160,14 +161,30 @@ export default function FacultyProgress() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>
+        return <Badge className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 border-emerald-200 shadow-sm">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Completed
+        </Badge>
       case "in_progress":
-        return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+        return <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-blue-200 shadow-sm">
+          <Clock className="h-3 w-3 mr-1" />
+          In Progress
+        </Badge>
       case "approved":
-        return <Badge className="bg-blue-100 text-blue-800">Approved</Badge>
+        return <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-blue-200 shadow-sm">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Approved
+        </Badge>
       default:
-        return <Badge variant="secondary">{status}</Badge>
+        return <Badge variant="secondary" className="shadow-sm">{status}</Badge>
     }
+  }
+
+  const getProgressColor = (completion: number) => {
+    if (completion >= 80) return "bg-gradient-to-r from-emerald-500 to-green-500"
+    if (completion >= 50) return "bg-gradient-to-r from-blue-500 to-indigo-500"
+    if (completion >= 25) return "bg-gradient-to-r from-amber-500 to-orange-500"
+    return "bg-gradient-to-r from-red-500 to-rose-500"
   }
 
   // Filter students by name or roll number
@@ -177,108 +194,247 @@ export default function FacultyProgress() {
       student.rollNumber.toLowerCase().includes(search.toLowerCase())
   )
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading progress data...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <FacultyNavbar />
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-100 to-pink-100 rounded-full opacity-30 blur-3xl"></div>
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Student Progress</h1>
-            <p className="mt-2 text-gray-600">Track the progress of approved and completed projects under your guidance</p>
-          </div>
-
-          {/* Search input */}
-          <div className="mb-6 max-w-md">
-            <Input
-              placeholder="Search by student name or roll number"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-white"
-            />
-          </div>
-
-          <div className="space-y-6">
-            {loading ? (
-              <div className="text-gray-500">Loading...</div>
-            ) : filteredStudents.length === 0 ? (
-              <div className="text-gray-500">
-                {search ? "No students found matching your search." : "No students with approved or completed projects found."}
+          {/* Header Section */}
+          <div className="mb-10">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                <TrendingUp className="h-6 w-6 text-white" />
               </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  Student Progress
+                </h1>
+                <p className="mt-2 text-gray-600 text-lg">Track the progress of approved and completed projects under your guidance</p>
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  className="pl-10 bg-white/80 backdrop-blur-sm border-0 shadow-lg focus:shadow-xl transition-all duration-300"
+                  placeholder="Search by student name or roll number..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Students with Projects</CardTitle>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <User className="h-4 w-4 text-blue-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600 mb-1">{students.length}</div>
+                <p className="text-xs text-blue-700 font-medium">Under your guidance</p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-amber-50 to-orange-50 hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Active Projects</CardTitle>
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-amber-600 mb-1">
+                  {students.reduce(
+                    (acc, student) => acc + student.projects.filter((p: any) => 
+                      p.status === "in_progress" || p.status === "approved"
+                    ).length,
+                    0,
+                  )}
+                </div>
+                <p className="text-xs text-amber-700 font-medium">Currently in progress</p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Completed Projects</CardTitle>
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-emerald-600 mb-1">
+                  {students.reduce(
+                    (acc, student) => acc + student.projects.filter((p: any) => 
+                      p.status === "completed" || p.completion === 100
+                    ).length,
+                    0,
+                  )}
+                </div>
+                <p className="text-xs text-emerald-700 font-medium">Successfully finished</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Students List */}
+          <div className="space-y-6">
+            {filteredStudents.length === 0 ? (
+              <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                <CardContent className="py-16 text-center">
+                  <BarChart3 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                    {search ? "No students found" : "No students with projects"}
+                  </h3>
+                  <p className="text-gray-500">
+                    {search ? "Try adjusting your search criteria." : "Students with approved or completed projects will appear here."}
+                  </p>
+                </CardContent>
+              </Card>
             ) : (
               filteredStudents.map((student) => (
-                <Card key={student.id}>
-                  <CardHeader>
+                <Card key={student.id} className="shadow-xl border-0 bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+                  <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-gray-100">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{student.name}</CardTitle>
-                        <CardDescription>Roll Number: {student.rollNumber}</CardDescription>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
+                          <User className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl text-gray-900">{student.name}</CardTitle>
+                          <CardDescription className="text-gray-600 font-medium">Roll Number: {student.rollNumber}</CardDescription>
+                        </div>
                       </div>
-                      <Badge variant="outline">{student.projects.length} Project(s)</Badge>
+                      <Badge variant="outline" className="bg-white shadow-sm">
+                        <FileText className="h-3 w-3 mr-1" />
+                        {student.projects.length} Project(s)
+                      </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {student.projects.map((project: any) => (
-                        <div key={project.id} className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium">{project.name}</h4>
+                  <CardContent className="p-6">
+                    <div className="space-y-6">
+                      {student.projects.map((project: Project) => (
+                        <div key={project.id} className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <Target className="h-5 w-5 text-blue-600" />
+                              <h4 className="font-semibold text-lg text-gray-900">{project.name}</h4>
+                            </div>
                             {getStatusBadge(project.status)}
                           </div>
 
-                          <div className="space-y-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm font-medium">Progress</span>
-                                <span className="text-sm text-gray-600">{project.completion}%</span>
+                          <div className="space-y-4">
+                            <div className="bg-white p-4 rounded-lg border border-gray-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-gray-700">Progress</span>
+                                <span className="text-sm font-bold text-gray-900">{project.completion}%</span>
                               </div>
-                              <Progress value={project.completion} className="h-2" />
+                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all duration-500 ${getProgressColor(project.completion)}`}
+                                  style={{ width: `${project.completion}%` }}
+                                ></div>
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Calendar className="h-4 w-4" />
-                              Last updated: {project.lastUpdate || "Not updated yet"}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                                  <Calendar className="h-4 w-4" />
+                                  <span className="font-medium">Last Updated</span>
+                                </div>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {project.lastUpdate || "Not updated yet"}
+                                </p>
+                              </div>
+
+                              {project.submittedDate && (
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                                    <Calendar className="h-4 w-4" />
+                                    <span className="font-medium">Submitted</span>
+                                  </div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {new Date(project.submittedDate).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              )}
                             </div>
 
-                            {project.submittedDate && (
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Calendar className="h-4 w-4" />
-                                Submitted: {new Date(project.submittedDate).toLocaleDateString()}
-                              </div>
-                            )}
-
-                            <div>
-                              <h5 className="text-sm font-medium mb-1 flex items-center gap-2">
+                            <div className="bg-white p-4 rounded-lg border border-gray-200">
+                              <h5 className="text-sm font-semibold mb-3 flex items-center gap-2 text-gray-700">
                                 <Clock className="h-4 w-4" />
                                 Latest Update
                               </h5>
-                              <p className="text-sm text-gray-600 bg-white p-3 rounded border">{project.eodUpdate}</p>
+                              <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                {project.eodUpdate}
+                              </p>
                             </div>
 
-                            {/* Show last 3 updates and "View all" button if more */}
-                            <div className="space-y-2">
-                              {project.updates?.slice(0, 3).map((update: any, idx: number) => (
-                                <div key={update._id || idx} className="bg-white p-2 rounded border">
-                                  <p className="text-sm text-gray-800">{update.updateText}</p>
-                                  <div className="flex justify-between text-xs text-gray-500">
-                                    <span>{new Date(update.date).toLocaleDateString()}</span>
-                                    <span>{new Date(update.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                  </div>
+                            {/* Progress Updates */}
+                            <div className="bg-white p-4 rounded-lg border border-gray-200">
+                              <h5 className="text-sm font-semibold mb-3 flex items-center gap-2 text-gray-700">
+                                <BarChart3 className="h-4 w-4" />
+                                Recent Updates
+                              </h5>
+                              
+                              {(!project.updates || project.updates.length === 0) ? (
+                                <div className="text-center py-6 text-gray-500">
+                                  <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                                  <p className="text-sm">No progress updates yet</p>
                                 </div>
-                              ))}
+                              ) : (
+                                <div className="space-y-3">
+                                  {project.updates.slice(0, 3).map((update: ProgressUpdate, idx: number) => (
+                                    <div key={update._id || idx} className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-100">
+                                      <p className="text-sm text-gray-800 mb-2">{update.updateText}</p>
+                                      <div className="flex justify-between text-xs text-gray-600">
+                                        <span className="font-medium">
+                                          {new Date(update.date).toLocaleDateString()}
+                                        </span>
+                                        <span>
+                                          {new Date(update.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
 
-                              {project.updates?.length > 3 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full"
-                                  onClick={() => setShowAllUpdates({ projectName: project.name, updates: project.updates })}
-                                >
-                                  View all {project.updates.length} updates
-                                </Button>
-                              )}
-
-                              {(!project.updates || project.updates.length === 0) && (
-                                <div className="text-sm text-gray-500 italic">No progress updates yet</div>
+                                  {project.updates.length > 3 && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full mt-3 bg-white hover:bg-gray-50 shadow-sm"
+                                      onClick={() => setShowAllUpdates({ projectName: project.name, updates: project.updates })}
+                                    >
+                                      View all {project.updates.length} updates
+                                    </Button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -290,90 +446,50 @@ export default function FacultyProgress() {
               ))
             )}
           </div>
-
-          {/* Summary Stats */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Students with Projects</CardTitle>
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{students.length}</div>
-                <p className="text-xs text-muted-foreground">Under your guidance</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-                <Clock className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {students.reduce(
-                    (acc, student) => acc + student.projects.filter((p: any) => 
-                      p.status === "in_progress" || p.status === "approved"
-                    ).length,
-                    0,
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Currently in progress</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completed Projects</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {students.reduce(
-                    (acc, student) => acc + student.projects.filter((p: any) => 
-                      p.status === "completed" || p.completion === 100
-                    ).length,
-                    0,
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Successfully finished</p>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
 
       {/* Dialog to show all updates */}
       {showAllUpdates && (
         <Dialog open={!!showAllUpdates} onOpenChange={() => setShowAllUpdates(null)}>
-          <DialogContent className="max-w-2xl p-6">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-semibold">
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader className="border-b pb-4">
+              <DialogTitle className="text-xl font-semibold flex items-center gap-3">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
                 All Updates for "{showAllUpdates.projectName}"
               </DialogTitle>
             </DialogHeader>
 
-            {/* Scrollable updates list */}
-            <div className="space-y-4 max-h-[400px] overflow-y-auto">
-              {showAllUpdates.updates.length > 0 ? (
-                showAllUpdates.updates.map((update: any) => (
-                  <div
-                    key={update._id}
-                    className="bg-gray-100 rounded-xl p-4"
-                  >
-                    <div className="text-base font-medium text-gray-900">{update.updateText}</div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      {new Date(update.date).toLocaleDateString()} at {new Date(update.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <ScrollArea className="max-h-[500px] pr-4">
+              <div className="space-y-4 py-4">
+                {showAllUpdates.updates.length > 0 ? (
+                  showAllUpdates.updates.map((update: ProgressUpdate, index: number) => (
+                    <div
+                      key={update._id || index}
+                      className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          Update #{showAllUpdates.updates.length - index}
+                        </Badge>
+                        <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
+                          {new Date(update.date).toLocaleDateString()} at {new Date(update.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-800 leading-relaxed">{update.updateText}</p>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No progress updates available</p>
                   </div>
-                ))
-              ) : (
-                <div className="text-gray-500 text-center py-4">No progress updates available</div>
-              )}
-            </div>
+                )}
+              </div>
+            </ScrollArea>
 
-            <div className="mt-4 flex justify-end">
-              <Button variant="outline" onClick={() => setShowAllUpdates(null)}>
+            <div className="border-t pt-4 flex justify-end">
+              <Button variant="outline" onClick={() => setShowAllUpdates(null)} className="shadow-sm">
                 Close
               </Button>
             </div>
