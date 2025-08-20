@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Star, FileText, Award, Search, User, Calendar, BarChart3, TrendingUp, CheckCircle, Clock, Edit3 } from "lucide-react"
+import { Star, FileText, Award, Search, User, Calendar, BarChart3, TrendingUp, CheckCircle, Clock, Edit3, Download } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
@@ -59,6 +59,79 @@ export default function FacultyEvaluation() {
   const [error, setError] = useState<string>("")
   const [search, setSearch] = useState("")
   const [editMode, setEditMode] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  // Export to Excel function
+  const exportToExcel = () => {
+    setExporting(true)
+    try {
+      const evaluatedStudents = studentsForEvaluation.filter(s => s.status === "evaluated")
+      
+      if (evaluatedStudents.length === 0) {
+        toast.error("No evaluated students to export")
+        setExporting(false)
+        return
+      }
+
+      // Prepare CSV content
+      const headers = [
+        "Student Name",
+        "Roll Number",
+        "Project Name",
+        "Submission Date",
+        "Code Quality (/25)",
+        "Functionality (/30)",
+        "User Interface (/20)",
+        "Documentation (/15)",
+        "Innovation (/10)",
+        "Total Score (/100)",
+        "Grade",
+        "Comments",
+        "Recommendations",
+        "Evaluated Date"
+      ]
+
+      const csvContent = [
+        headers.join(","),
+        ...evaluatedStudents.map(student => {
+          const evaluation = student.evaluation
+          return [
+            `"${student.name}"`,
+            `"${student.rollNumber}"`,
+            `"${student.project}"`,
+            `"${student.submissionDate ? new Date(student.submissionDate).toLocaleDateString() : ''}"`,
+            evaluation?.criteriaScores["Code Quality"] || 0,
+            evaluation?.criteriaScores["Functionality"] || 0,
+            evaluation?.criteriaScores["User Interface"] || 0,
+            evaluation?.criteriaScores["Documentation"] || 0,
+            evaluation?.criteriaScores["Innovation"] || 0,
+            student.score || evaluation?.totalScore || 0,
+            `"${student.grade || evaluation?.grade || ''}"`,
+            `"${evaluation?.comments?.replace(/"/g, '""') || ''}"`,
+            `"${evaluation?.recommendations?.replace(/"/g, '""') || ''}"`,
+            `"${evaluation?.evaluatedAt ? new Date(evaluation.evaluatedAt).toLocaleDateString() : ''}"`
+          ].join(",")
+        })
+      ].join("\n")
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", `evaluation_results_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      toast.success("Evaluation results exported successfully!")
+    } catch (error) {
+      toast.error("Failed to export evaluation results")
+      console.error("Export error:", error)
+    }
+    setExporting(false)
+  }
 
   // Fetch students and only their 100% completed projects
   useEffect(() => {
@@ -339,16 +412,37 @@ export default function FacultyEvaluation() {
         <div className="px-4 py-6 sm:px-0">
           {/* Header Section */}
           <div className="mb-10">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-                <Award className="h-6 w-6 text-white" />
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                  <Award className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                    Project Evaluation
+                  </h1>
+                  <p className="mt-2 text-gray-600 text-lg">Evaluate and grade completed student projects</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                  Project Evaluation
-                </h1>
-                <p className="mt-2 text-gray-600 text-lg">Evaluate and grade completed student projects</p>
-              </div>
+              
+              {/* Export Button */}
+              <Button 
+                onClick={exportToExcel}
+                disabled={exporting || studentsForEvaluation.filter(s => s.status === "evaluated").length === 0}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg"
+              >
+                {exporting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Results
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
@@ -691,7 +785,7 @@ export default function FacultyEvaluation() {
           </div>
 
           {/* Evaluation Statistics */}
-          <div className="mt-10 grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-700">Total Evaluations</CardTitle>
@@ -727,7 +821,7 @@ export default function FacultyEvaluation() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-xl border-0 bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-2xl transition-all duration-300">
+            {/* <Card className="shadow-xl border-0 bg-gradient-to-br from-red-50 to-rose-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-700">Pending Reviews</CardTitle>
                 <div className="p-2 bg-red-100 rounded-lg">
@@ -740,7 +834,7 @@ export default function FacultyEvaluation() {
                 </div>
                 <p className="text-xs text-red-700 font-medium">Awaiting evaluation</p>
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card className="shadow-xl border-0 bg-gradient-to-br from-emerald-50 to-green-50 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

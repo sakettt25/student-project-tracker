@@ -15,6 +15,7 @@ export default function FacultyDashboard() {
     pending: 0,
     approved: 0,
     rejected: 0,
+    evaluated: 0,
   })
   const [projects, setProjects] = useState([])
   const [facultyDetails, setFacultyDetails] = useState<{ name: string; university: string; email: string } | null>(null)
@@ -38,13 +39,14 @@ export default function FacultyDashboard() {
           const data = await response.json()
           setProjects(data.projects)
 
-          // Calculate stats
+          // Calculate stats - including evaluated projects
           const inReview = data.projects.filter((p: any) => p.status === "in_review").length
           const pending = data.projects.filter((p: any) => p.status === "pending").length
           const approved = data.projects.filter((p: any) => p.status === "approved").length
           const rejected = data.projects.filter((p: any) => p.status === "rejected").length
+          const evaluated = data.projects.filter((p: any) => p.status === "evaluated").length
 
-          setStats({ inReview, pending, approved, rejected })
+          setStats({ inReview, pending, approved, rejected, evaluated })
         }
       } catch (error) {
         console.error("Failed to fetch projects:", error)
@@ -200,7 +202,7 @@ export default function FacultyDashboard() {
                   <Badge variant="secondary" className="bg-amber-100 text-amber-800 px-3 py-1 text-sm font-semibold">
                     {loadingProjects
                       ? <div className="h-4 w-8 bg-amber-200 rounded animate-pulse"></div>
-                      : stats.inReview + stats.pending}
+                      : stats.inReview + stats.pending + stats.approved}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
@@ -211,7 +213,7 @@ export default function FacultyDashboard() {
                   <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 px-3 py-1 text-sm font-semibold">
                     {loadingProjects
                       ? <div className="h-4 w-8 bg-emerald-200 rounded animate-pulse"></div>
-                      : stats.approved}
+                      : stats.evaluated}
                   </Badge>
                 </div>
               </CardContent>
@@ -226,7 +228,7 @@ export default function FacultyDashboard() {
             </h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <Card className="shadow-xl border-0 bg-gradient-to-br from-yellow-50 to-amber-50 hover:shadow-2xl transition-all duration-300 hover:scale-105">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-700">Projects Pending</CardTitle>
@@ -257,7 +259,7 @@ export default function FacultyDashboard() {
                     ? <div className="h-8 w-12 bg-green-200 rounded animate-pulse"></div>
                     : stats.approved}
                 </div>
-                <p className="text-xs text-green-700 font-medium">Completed successfully</p>
+                <p className="text-xs text-green-700 font-medium">Ready for work</p>
               </CardContent>
             </Card>
 
@@ -275,6 +277,23 @@ export default function FacultyDashboard() {
                     : stats.rejected}
                 </div>
                 <p className="text-xs text-red-700 font-medium">Rejected by you</p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50 to-cyan-50 hover:shadow-2xl transition-all duration-300 hover:scale-105">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Projects Completed</CardTitle>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600 mb-1">
+                  {loadingProjects
+                    ? <div className="h-8 w-12 bg-blue-200 rounded animate-pulse"></div>
+                    : stats.evaluated}
+                </div>
+                <p className="text-xs text-blue-700 font-medium">Evaluation done</p>
               </CardContent>
             </Card>
 
